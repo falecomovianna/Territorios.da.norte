@@ -273,7 +273,7 @@ body {
   border: 2px solid var(--cinza2);
   border-radius: 16px;
   padding: 12px;
-  min-height: 380px;
+  min-height: 520px;
   position: relative;
   display: flex; flex-direction: column; gap: 6px;
 }
