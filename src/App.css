@@ -479,3 +479,69 @@ body {
   gap: 12px; color: var(--texto2);
 }
 .mapa-empty p { font-size: 14px; font-weight: 600; }
+
+/* ── NOVO LAYOUT DA QUADRA ───────────────────────────────────────────────────── */
+.quadra-wrap {
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+
+.rua-label-wrap {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 28px;
+}
+.rua-topo-wrap, .rua-baixo-wrap { width: 100%; }
+.rua-lado-wrap { width: 44px; flex-shrink: 0; }
+
+.quadra-linha-meio {
+  display: flex; align-items: stretch; gap: 4px;
+}
+
+.quadra-box {
+  flex: 1;
+  background: #f8fafc;
+  border: 2px solid var(--cinza2);
+  border-radius: 16px;
+  padding: 10px;
+  min-height: 420px;
+  position: relative;
+  display: flex; flex-direction: column; gap: 8px;
+}
+
+.quadra-label-bg {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 42px; font-weight: 900;
+  color: var(--cinza2);
+  pointer-events: none; user-select: none;
+  z-index: 0;
+}
+
+/* Fileiras de casas */
+.fileira {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  z-index: 1; position: relative;
+}
+.fileira-topo { align-self: flex-start; }
+.fileira-baixo { align-self: flex-end; margin-top: auto; }
+
+.fileiras-laterais {
+  display: flex; justify-content: space-between;
+  flex: 1; z-index: 1; position: relative;
+}
+.fileira-lateral {
+  display: flex; flex-direction: column; gap: 5px;
+}
+.fileira-lateral.direita { align-items: flex-end; }
+
+.rua-label.vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  transform: rotate(180deg);
+  max-height: 160px;
+}
+
+.input-rua.vertical {
+  writing-mode: vertical-rl;
+  width: 36px; height: 120px;
+}
