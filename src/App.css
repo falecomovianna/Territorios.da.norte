@@ -266,13 +266,14 @@ body {
   display: flex; align-items: stretch; gap: 6px;
 }
 
+/* RETANGULAR - melhor para celular */
 .quadra-interior {
   flex: 1;
   background: #f8fafc;
   border: 2px solid var(--cinza2);
   border-radius: 16px;
   padding: 12px;
-  min-height: 240px;
+  min-height: 380px;
   position: relative;
   display: flex; flex-direction: column; gap: 6px;
 }
@@ -360,8 +361,24 @@ body {
   cursor: pointer;
 }
 
+/* ── CONTROLES DA CASA (mover + deletar) ─────────────────────────────────── */
+.casa-controles {
+  position: absolute; top: -14px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; gap: 2px; z-index: 3;
+}
+.casa-mover {
+  background: #334155;
+  color: white;
+  border: none; border-radius: 4px;
+  width: 20px; height: 20px;
+  font-size: 10px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.1s;
+}
+.casa-mover:hover { background: var(--azul); }
+
 .casa-delete {
-  position: absolute; top: -6px; right: -6px;
   background: #1e293b;
   color: white;
   border: none; border-radius: 50%;
@@ -371,6 +388,7 @@ body {
   font-size: 10px;
   z-index: 2;
 }
+.casa-delete:hover { background: var(--vermelho); }
 
 .add-casa-inline {
   display: flex; align-items: center; gap: 4px;
