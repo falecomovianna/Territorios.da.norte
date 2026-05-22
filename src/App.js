@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import {
   collection, doc, getDocs, getDoc,
-  addDoc, updateDoc, deleteDoc, setDoc
+  addDoc, updateDoc, deleteDoc
 } from 'firebase/firestore';
 import './App.css';
 
@@ -74,7 +74,6 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
     const list = [];
     for (const d of snap.docs) {
       const data = { id: d.id, ...d.data() };
-      // Count quadras and calculate overall progress
       const quadrasSnap = await getDocs(collection(db, 'territorios', d.id, 'quadras'));
       let totalCasas = 0, visitadas = 0;
       for (const q of quadrasSnap.docs) {
@@ -109,7 +108,6 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
           <p className="header-sub">Selecione um território para gerenciar</p>
         </div>
       </div>
-
       <div className="list">
         {territorios.map(t => (
           <div key={t.id} className="card">
@@ -135,7 +133,6 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
             </div>
           </div>
         ))}
-
         {showAdd ? (
           <div className="add-form">
             <input
@@ -193,7 +190,6 @@ function MapaScreen({ territorio, onBack }) {
         </div>
         <button className="icon-btn" onClick={() => setEditingUrl(true)}><PencilIcon /></button>
       </div>
-
       {editingUrl && (
         <div className="modal-overlay">
           <div className="modal">
@@ -212,26 +208,17 @@ function MapaScreen({ territorio, onBack }) {
           </div>
         </div>
       )}
-
       <div className="mapa-container">
         {embedUrl ? (
-          <iframe
-            src={embedUrl}
-            title="Mapa do Território"
-            className="mapa-iframe"
-            allowFullScreen
-          />
+          <iframe src={embedUrl} title="Mapa do Território" className="mapa-iframe" allowFullScreen />
         ) : (
           <div className="mapa-empty">
             <MapIcon />
             <p>Nenhum mapa configurado</p>
-            <button className="btn-primary" onClick={() => setEditingUrl(true)}>
-              Adicionar Link do Mapa
-            </button>
+            <button className="btn-primary" onClick={() => setEditingUrl(true)}>Adicionar Link do Mapa</button>
           </div>
         )}
       </div>
-
       <button className="btn-full" onClick={onBack}>Ver Quadras para Marcar Casas</button>
     </div>
   );
@@ -259,7 +246,6 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       data.progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
       list.push(data);
     }
-    // Sort by name
     list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
     setQuadras(list);
     setLoading(false);
@@ -287,12 +273,10 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
           <p className="topbar-sub">{quadras.length} Quadra{quadras.length !== 1 ? 's' : ''}</p>
         </div>
       </div>
-
       <div className="legenda">
         <div className="legenda-item"><span className="dot vermelho"/><span>Não Atendeu / Não Visitado</span></div>
         <div className="legenda-item"><span className="dot verde"/><span>Sim (Atendeu)</span></div>
       </div>
-
       <div className="quadras-grid">
         {quadras.map(q => (
           <div key={q.id} className="quadra-card" onClick={() => onSelectQuadra(q)}>
@@ -301,9 +285,8 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
             <ProgressBar value={q.progresso} />
           </div>
         ))}
-
         {showAdd ? (
-          <div className="add-form">
+          <div className="add-form" style={{gridColumn:'span 2'}}>
             <input
               className="input"
               placeholder="Nome da quadra (ex: Q1)"
@@ -334,7 +317,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [confirmCasa, setConfirmCasa] = useState(null);
-  const [showAddCasa, setShowAddCasa] = useState(null); // 'topo'|'baixo'|'esquerda'|'direita'
+  const [showAddCasa, setShowAddCasa] = useState(null);
   const [novoCasaNum, setNovoCasaNum] = useState('');
   const [editRuas, setEditRuas] = useState({ topo: '', baixo: '', esquerda: '', direita: '' });
 
@@ -347,10 +330,10 @@ function CasasScreen({ territorio, quadra, onBack }) {
     const r = q.ruas || { topo: '', baixo: '', esquerda: '', direita: '' };
     setRuas(r);
     setEditRuas(r);
-
     const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
     const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    list.sort((a, b) => String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
+    // Ordena por campo 'ordem', depois por número
+    list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
     setCasas(list);
     setLoading(false);
   }
@@ -363,14 +346,30 @@ function CasasScreen({ territorio, quadra, onBack }) {
 
   async function addCasa(lado) {
     if (!novoCasaNum.trim()) return;
+    const casasDoLado = casas.filter(c => c.lado === lado);
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'), {
       numero: novoCasaNum.trim(),
       lado,
       visitada: false,
-      atendeu: null
+      atendeu: null,
+      ordem: casasDoLado.length
     });
     setNovoCasaNum('');
     setShowAddCasa(null);
+    loadData();
+  }
+
+  // ── MOVER CASA (◀ ▶) ──────────────────────────────────────────────────────
+  async function moverCasa(casa, direcao) {
+    const doLado = casas
+      .filter(c => c.lado === casa.lado)
+      .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    const idx = doLado.findIndex(c => c.id === casa.id);
+    const novoIdx = idx + direcao;
+    if (novoIdx < 0 || novoIdx >= doLado.length) return;
+    const outro = doLado[novoIdx];
+    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
+    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
     loadData();
   }
 
@@ -411,9 +410,11 @@ function CasasScreen({ territorio, quadra, onBack }) {
             onClick={() => !editMode && setConfirmCasa(c)}
           >
             {editMode && (
-              <button className="casa-delete" onClick={e => { e.stopPropagation(); deletarCasa(c); }}>
-                <TrashIcon />
-              </button>
+              <div className="casa-controles">
+                <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, -1); }}>◀</button>
+                <button className="casa-delete" onClick={e => { e.stopPropagation(); deletarCasa(c); }}><TrashIcon /></button>
+                <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, 1); }}>▶</button>
+              </div>
             )}
             <span className="casa-num">{c.numero}</span>
           </div>
@@ -457,9 +458,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
         </button>
       </div>
 
-      {/* Mapa da Quadra */}
       <div className="quadra-mapa">
-        {/* Rua de cima */}
         <div className="rua rua-topo">
           {editMode ? (
             <input className="input-rua" value={editRuas.topo} onChange={e => setEditRuas({ ...editRuas, topo: e.target.value })} placeholder="Rua de cima" />
@@ -467,14 +466,12 @@ function CasasScreen({ territorio, quadra, onBack }) {
         </div>
 
         <div className="quadra-meio">
-          {/* Rua da esquerda */}
           <div className="rua rua-esquerda">
             {editMode ? (
               <input className="input-rua vertical" value={editRuas.esquerda} onChange={e => setEditRuas({ ...editRuas, esquerda: e.target.value })} placeholder="Rua esq." />
             ) : ruas.esquerda ? <span className="rua-label vertical">{ruas.esquerda.toUpperCase()}</span> : null}
           </div>
 
-          {/* Quadra interior */}
           <div className="quadra-interior">
             <div className="quadra-label">{quadra.nome}</div>
             {renderCasas('topo')}
@@ -483,7 +480,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
             {renderCasas('direita')}
           </div>
 
-          {/* Rua da direita */}
           <div className="rua rua-direita">
             {editMode ? (
               <input className="input-rua vertical" value={editRuas.direita} onChange={e => setEditRuas({ ...editRuas, direita: e.target.value })} placeholder="Rua dir." />
@@ -491,7 +487,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
           </div>
         </div>
 
-        {/* Rua de baixo */}
         <div className="rua rua-baixo">
           {editMode ? (
             <input className="input-rua" value={editRuas.baixo} onChange={e => setEditRuas({ ...editRuas, baixo: e.target.value })} placeholder="Rua de baixo" />
@@ -499,7 +494,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
         </div>
       </div>
 
-      {/* Modal confirmar visita */}
       {confirmCasa && (
         <div className="modal-overlay">
           <div className="modal">
@@ -539,10 +533,7 @@ export default function App() {
         />
       )}
       {screen === 'mapa' && (
-        <MapaScreen
-          territorio={territorioSel}
-          onBack={() => setScreen('territorios')}
-        />
+        <MapaScreen territorio={territorioSel} onBack={() => setScreen('territorios')} />
       )}
       {screen === 'quadras' && (
         <QuadrasScreen
@@ -552,11 +543,7 @@ export default function App() {
         />
       )}
       {screen === 'casas' && (
-        <CasasScreen
-          territorio={territorioSel}
-          quadra={quadraSel}
-          onBack={() => setScreen('quadras')}
-        />
+        <CasasScreen territorio={territorioSel} quadra={quadraSel} onBack={() => setScreen('quadras')} />
       )}
     </div>
   );
