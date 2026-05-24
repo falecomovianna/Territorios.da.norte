@@ -305,9 +305,24 @@ function CasasScreen({ territorio, quadra, onBack }) {
 
   async function addCasa(lado) {
     if (!novoCasaNum.trim()) return;
-    const casasDoLado = casas.filter(c => c.lado === lado);
+    const casasDoLado = casas.filter(c => c.lado === lado)
+      .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    
+    // Descobre onde inserir pelo número
+    const novoNum = parseInt(novoCasaNum.trim()) || 0;
+    let posicao = casasDoLado.length;
+    for (let i = 0; i < casasDoLado.length; i++) {
+      const numExist = parseInt(casasDoLado[i].numero) || 0;
+      if (novoNum < numExist) { posicao = i; break; }
+    }
+
+    // Empurra as casas seguintes para frente
+    for (let i = posicao; i < casasDoLado.length; i++) {
+      await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casasDoLado[i].id), { ordem: i + 1 });
+    }
+
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'), {
-      numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: casasDoLado.length
+      numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
     setNovoCasaNum(''); setShowAddCasa(null); loadData();
   }
