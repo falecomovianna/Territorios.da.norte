@@ -136,9 +136,14 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
 
 // ─── SCREEN 1B: MAPA ──────────────────────────────────────────────────────────
 function MapaScreen({ territorio, onBack, onVerQuadras }) {
-  const [mapaUrl, setMapaUrl] = useState(territorio.mapaUrl || '');
+  const [mapaUrl, setMapaUrl] = useState('');
   const [editingUrl, setEditingUrl] = useState(false);
-  const [inputUrl, setInputUrl] = useState(territorio.mapaUrl || '');
+  const [inputUrl, setInputUrl] = useState('');
+
+  useEffect(() => {
+    setMapaUrl(territorio.mapaUrl || '');
+    setInputUrl(territorio.mapaUrl || '');
+  }, [territorio.id]);
 
   async function salvarUrl() {
     await updateDoc(doc(db, 'territorios', territorio.id), { mapaUrl: inputUrl });
