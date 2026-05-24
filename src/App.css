@@ -505,7 +505,7 @@ body {
   padding: 10px;
   min-height: 420px;
   position: relative;
-  display: flex; flex-direction: column; gap: 8px;
+  display: flex; flex-direction: column;
 }
 
 .quadra-label-bg {
@@ -517,22 +517,45 @@ body {
   z-index: 0;
 }
 
-/* Fileiras de casas */
-.fileira {
+/* Fileira topo: casas + botão centralizado */
+.fileira-topo {
   display: flex; flex-wrap: wrap; gap: 5px;
+  justify-content: center;
   z-index: 1; position: relative;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed var(--cinza2);
+  min-height: 54px; align-items: center;
 }
-.fileira-topo { align-self: flex-start; }
-.fileira-baixo { align-self: flex-end; margin-top: auto; }
 
+/* Fileira baixo: casas + botão centralizado */
+.fileira-baixo {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  justify-content: center;
+  z-index: 1; position: relative;
+  padding-top: 4px;
+  border-top: 1px dashed var(--cinza2);
+  min-height: 54px; align-items: center;
+  margin-top: auto;
+}
+
+/* Laterais */
 .fileiras-laterais {
-  display: flex; justify-content: space-between;
+  display: flex; justify-content: space-between; align-items: center;
   flex: 1; z-index: 1; position: relative;
+  padding: 8px 0;
 }
 .fileira-lateral {
   display: flex; flex-direction: column; gap: 5px;
+  align-items: center;
+  min-width: 54px;
+  border-right: 1px dashed var(--cinza2);
+  padding-right: 6px;
 }
-.fileira-lateral.direita { align-items: flex-end; }
+.fileira-lateral.direita {
+  border-right: none;
+  border-left: 1px dashed var(--cinza2);
+  padding-right: 0; padding-left: 6px;
+}
 
 .rua-label.vertical {
   writing-mode: vertical-rl;
