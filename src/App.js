@@ -67,20 +67,12 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
   async function loadTerritorios() {
     setLoading(true);
     const snap = await getDocs(collection(db, 'territorios'));
-    const list = [];
-    for (const d of snap.docs) {
-      const data = { id: d.id, ...d.data() };
-      const quadrasSnap = await getDocs(collection(db, 'territorios', d.id, 'quadras'));
-      let totalCasas = 0, visitadas = 0;
-      for (const q of quadrasSnap.docs) {
-        const casasSnap = await getDocs(collection(db, 'territorios', d.id, 'quadras', q.id, 'casas'));
-        totalCasas += casasSnap.size;
-        visitadas += casasSnap.docs.filter(c => c.data().visitada).length;
-      }
-      data.quadrasCount = quadrasSnap.size;
-      data.progresso = totalCasas > 0 ? Math.round((visitadas / totalCasas) * 100) : 0;
-      list.push(data);
-    }
+    const list = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      quadrasCount: 0,
+      progresso: d.data().progresso ?? 0
+    }));
     list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
     setTerritorios(list);
     setLoading(false);
@@ -143,7 +135,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
 }
 
 // ─── SCREEN 1B: MAPA ──────────────────────────────────────────────────────────
-function MapaScreen({ territorio, onBack }) {
+function MapaScreen({ territorio, onBack, onVerQuadras }) {
   const [mapaUrl, setMapaUrl] = useState(territorio.mapaUrl || '');
   const [editingUrl, setEditingUrl] = useState(false);
   const [inputUrl, setInputUrl] = useState(territorio.mapaUrl || '');
@@ -201,7 +193,7 @@ function MapaScreen({ territorio, onBack }) {
           </div>
         )}
       </div>
-      <button className="btn-full" onClick={onBack}>Ver Quadras para Marcar Casas</button>
+      <button className="btn-full" onClick={onVerQuadras}>Ver Quadras para Marcar Casas</button>
     </div>
   );
 }
@@ -554,7 +546,7 @@ export default function App() {
           onSelectMapa={t => { setTerritorioSel(t); setScreen('mapa'); }}
         />
       )}
-      {screen === 'mapa' && <MapaScreen territorio={territorioSel} onBack={() => setScreen('territorios')} />}
+      {screen === 'mapa' && <MapaScreen territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
       {screen === 'quadras' && (
         <QuadrasScreen
           territorio={territorioSel}
