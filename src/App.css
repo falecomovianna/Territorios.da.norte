@@ -541,22 +541,24 @@ body {
 
 /* Laterais */
 .fileiras-laterais {
-  display: flex; justify-content: space-between; align-items: stretch;
+  display: flex; justify-content: space-between;
   flex: 1; z-index: 1; position: relative;
-  padding: 8px 0;
+  padding: 4px 0;
+  min-height: 0;
 }
 .fileira-lateral {
-  display: flex; flex-direction: column; gap: 5px;
+  display: flex; flex-direction: column;
   align-items: center;
   justify-content: space-evenly;
-  min-width: 54px;
+  align-self: stretch;
+  min-width: 58px;
   border-right: 1px dashed var(--cinza2);
-  padding-right: 6px;
+  padding-right: 4px;
 }
 .fileira-lateral.direita {
   border-right: none;
   border-left: 1px dashed var(--cinza2);
-  padding-right: 0; padding-left: 6px;
+  padding-right: 0; padding-left: 4px;
 }
 
 .rua-label.vertical {
