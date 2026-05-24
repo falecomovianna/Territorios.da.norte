@@ -568,3 +568,17 @@ body {
   writing-mode: vertical-rl;
   width: 36px; height: 120px;
 }
+
+/* ── BOTÃO INSERIR ENTRE CASAS ───────────────────────────────────────────── */
+.btn-inserir {
+  width: 24px; height: 44px;
+  background: rgba(59,130,246,0.15);
+  border: 2px dashed var(--azul);
+  border-radius: 8px;
+  color: var(--azul);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; padding: 0;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+.btn-inserir:hover { background: rgba(59,130,246,0.3); }
