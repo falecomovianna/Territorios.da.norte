@@ -447,12 +447,8 @@ function CasasScreen({ territorio, quadra, onBack }) {
 
             {/* Casas esquerda e direita lado a lado */}
             <div className="fileiras-laterais">
-              <div className="fileira-lateral">
-                {renderFileiraCasas('esquerda')}
-              </div>
-              <div className="fileira-lateral direita">
-                {renderFileiraCasas('direita')}
-              </div>
+              {renderFileiraCasas('esquerda')}
+              {renderFileiraCasas('direita')}
             </div>
 
             {/* Casas do baixo */}
