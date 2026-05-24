@@ -591,3 +591,18 @@ body {
   transition: background 0.15s;
 }
 .btn-inserir:hover { background: rgba(59,130,246,0.3); }
+
+/* ── LÁPIS NA QUADRA CARD ─────────────────────────────────────────────────── */
+.quadra-card-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 2px;
+}
+.btn-lapis-quadra {
+  background: transparent; border: none;
+  color: var(--cinza3); cursor: pointer;
+  padding: 2px; display: flex;
+  transition: color 0.15s;
+}
+.btn-lapis-quadra:hover { color: var(--azul); }
+
+.topbar-title-grande { font-size: 22px; font-weight: 900; }
