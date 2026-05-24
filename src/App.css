@@ -344,6 +344,7 @@ body {
   position: relative;
   transition: all 0.15s;
   box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  margin: 2px;
 }
 .casa:hover { transform: scale(1.05); }
 .casa.vermelho { background: var(--vermelho); }
@@ -503,7 +504,7 @@ body {
   border: 2px solid var(--cinza2);
   border-radius: 16px;
   padding: 10px;
-  min-height: 420px;
+  min-height: 560px;
   position: relative;
   display: flex; flex-direction: column;
 }
