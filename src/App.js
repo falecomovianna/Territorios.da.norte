@@ -303,24 +303,13 @@ function CasasScreen({ territorio, quadra, onBack }) {
     setRuas(editRuas); setEditMode(false);
   }
 
-  async function addCasa(lado) {
+  async function addCasa(lado, posicao) {
     if (!novoCasaNum.trim()) return;
     const casasDoLado = casas.filter(c => c.lado === lado)
       .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
-    
-    // Descobre onde inserir pelo número
-    const novoNum = parseInt(novoCasaNum.trim()) || 0;
-    let posicao = casasDoLado.length;
-    for (let i = 0; i < casasDoLado.length; i++) {
-      const numExist = parseInt(casasDoLado[i].numero) || 0;
-      if (novoNum < numExist) { posicao = i; break; }
-    }
-
-    // Empurra as casas seguintes para frente
     for (let i = posicao; i < casasDoLado.length; i++) {
       await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casasDoLado[i].id), { ordem: i + 1 });
     }
-
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'), {
       numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
@@ -331,20 +320,16 @@ function CasasScreen({ territorio, quadra, onBack }) {
     const doLado = casas
       .filter(c => c.lado === casa.lado)
       .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
-
-    // Garante que todas as casas do lado têm ordem definida
     for (let i = 0; i < doLado.length; i++) {
       if (doLado[i].ordem === undefined || doLado[i].ordem === null) {
         await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', doLado[i].id), { ordem: i });
         doLado[i].ordem = i;
       }
     }
-
     const idx = doLado.findIndex(c => c.id === casa.id);
     const novoIdx = idx + direcao;
     if (novoIdx < 0 || novoIdx >= doLado.length) return;
     const outro = doLado[novoIdx];
-
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
     loadData();
@@ -370,41 +355,49 @@ function CasasScreen({ territorio, quadra, onBack }) {
       .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
   }
 
-  // Renderiza casas de um lado + botão de adicionar
+  function BtnInserir({ lado, posicao }) {
+    const chave = `${lado}-${posicao}`;
+    const ativo = showAddCasa === chave;
+    if (ativo) return (
+      <div className="add-casa-inline" onClick={e => e.stopPropagation()}>
+        <input className="input-small" placeholder="Nº" value={novoCasaNum}
+          onChange={e => setNovoCasaNum(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && addCasa(lado, posicao)} autoFocus />
+        <button className="btn-tiny" onClick={() => addCasa(lado, posicao)}>✓</button>
+        <button className="btn-tiny ghost" onClick={() => { setShowAddCasa(null); setNovoCasaNum(''); }}>✕</button>
+      </div>
+    );
+    return (
+      <button className="btn-inserir" onClick={() => { setShowAddCasa(chave); setNovoCasaNum(''); }}>
+        <PlusIcon />
+      </button>
+    );
+  }
+
   function renderFileiraCasas(lado) {
     const list = casasPorLado(lado);
     return (
       <div className={`fileira fileira-${lado}`}>
-        {list.map(c => (
-          <div key={c.id}
-            className={`casa ${c.visitada ? (c.atendeu ? 'verde' : 'vermelho') : 'vermelho'}`}
-            onClick={() => !editMode && setConfirmCasa(c)}
-          >
-            {editMode && (
-              <div className="casa-controles">
-                <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, -1); }}>◀</button>
-                <button className="casa-delete" onClick={e => { e.stopPropagation(); deletarCasa(c); }}><TrashIcon /></button>
-                <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, 1); }}>▶</button>
-              </div>
-            )}
-            <span className="casa-num">{c.numero}</span>
-          </div>
-        ))}
-        {editMode && (
-          showAddCasa === lado ? (
-            <div className="add-casa-inline" onClick={e => e.stopPropagation()}>
-              <input className="input-small" placeholder="Nº" value={novoCasaNum}
-                onChange={e => setNovoCasaNum(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && addCasa(lado)} autoFocus />
-              <button className="btn-tiny" onClick={() => addCasa(lado)}>✓</button>
-              <button className="btn-tiny ghost" onClick={() => { setShowAddCasa(null); setNovoCasaNum(''); }}>✕</button>
+        {editMode && <BtnInserir lado={lado} posicao={0} />}
+        {list.map((c, idx) => (
+          <React.Fragment key={c.id}>
+            <div
+              className={`casa ${c.visitada ? (c.atendeu ? 'verde' : 'vermelho') : 'vermelho'}`}
+              onClick={() => !editMode && setConfirmCasa(c)}
+            >
+              {editMode && (
+                <div className="casa-controles">
+                  <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, -1); }}>◀</button>
+                  <button className="casa-delete" onClick={e => { e.stopPropagation(); deletarCasa(c); }}><TrashIcon /></button>
+                  <button className="casa-mover" onClick={e => { e.stopPropagation(); moverCasa(c, 1); }}>▶</button>
+                </div>
+              )}
+              <span className="casa-num">{c.numero}</span>
             </div>
-          ) : (
-            <button className="casa add-casa-btn" onClick={() => { setShowAddCasa(lado); setNovoCasaNum(''); }}>
-              <PlusIcon />
-            </button>
-          )
-        )}
+            {editMode && <BtnInserir lado={lado} posicao={idx + 1} />}
+          </React.Fragment>
+        ))}
+        {list.length === 0 && !editMode && null}
       </div>
     );
   }
