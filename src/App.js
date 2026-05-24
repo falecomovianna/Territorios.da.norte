@@ -207,6 +207,7 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
+  const [editMode, setEditMode] = useState(false);
   const [editandoQuadra, setEditandoQuadra] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
 
@@ -253,7 +254,13 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
     <div className="screen">
       <div className="topbar">
         <button className="back-btn" onClick={onBack}><BackIcon /></button>
-        <div><h2 className="topbar-title">{territorio.nome}</h2><p className="topbar-sub">{quadras.length} Quadras</p></div>
+        <div>
+          <h2 className="topbar-title topbar-title-grande">{territorio.nome}</h2>
+          <p className="topbar-sub">{quadras.length} Quadras</p>
+        </div>
+        <button className={`icon-btn ${editMode ? 'active' : ''}`} onClick={() => { setEditMode(!editMode); setEditandoQuadra(null); }}>
+          <PencilIcon />
+        </button>
       </div>
       <div className="legenda">
         <div className="legenda-item"><span className="dot vermelho"/><span>Não Atendeu / Não Visitado</span></div>
@@ -261,22 +268,27 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       </div>
       <div className="quadras-grid">
         {quadras.map(q => (
-          <div key={q.id} className="quadra-card" onClick={() => editandoQuadra !== q.id && onSelectQuadra(q)}>
-            <div className="quadra-card-header">
-              {editandoQuadra === q.id ? (
-                <input className="input-small" style={{width:'80px', fontSize:'14px'}}
+          <div key={q.id} className="quadra-card" onClick={() => !editMode && onSelectQuadra(q)}>
+            {editMode && editandoQuadra === q.id ? (
+              <div className="quadra-card-header">
+                <input className="input-small" style={{width:'90px', fontSize:'15px', fontWeight:'800'}}
                   value={nomeEditado}
                   onChange={e => setNomeEditado(e.target.value)}
-                  onKeyDown={e => { if(e.key==='Enter') salvarNomeQuadra(q); e.stopPropagation(); }}
+                  onKeyDown={e => { if(e.key==='Enter') salvarNomeQuadra(q); }}
                   onClick={e => e.stopPropagation()}
                   autoFocus />
-              ) : (
+                <button className="btn-tiny" onClick={e => { e.stopPropagation(); salvarNomeQuadra(q); }}>✓</button>
+              </div>
+            ) : (
+              <div className="quadra-card-header">
                 <h3 className="quadra-nome">{q.nome}</h3>
-              )}
-              <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
-                <PencilIcon />
-              </button>
-            </div>
+                {editMode && (
+                  <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
+            )}
             <p className="quadra-sub">{q.casasCount} casa{q.casasCount !== 1 ? 's' : ''}</p>
             <ProgressBar value={q.progresso} />
           </div>
