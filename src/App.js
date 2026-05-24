@@ -207,6 +207,8 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
+  const [editandoQuadra, setEditandoQuadra] = useState(null);
+  const [nomeEditado, setNomeEditado] = useState('');
 
   useEffect(() => { loadQuadras(); }, []);
 
@@ -223,7 +225,11 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       data.progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
       list.push(data);
     }
-    list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
+    list.sort((a, b) => {
+      const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+      const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+      return numA - numB;
+    });
     setQuadras(list); setLoading(false);
   }
 
@@ -233,6 +239,12 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       nome: novoNome.trim(), ruas: { topo: '', baixo: '', esquerda: '', direita: '' }
     });
     setNovoNome(''); setShowAdd(false); loadQuadras();
+  }
+
+  async function salvarNomeQuadra(q) {
+    if (!nomeEditado.trim()) return;
+    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', q.id), { nome: nomeEditado.trim() });
+    setEditandoQuadra(null); loadQuadras();
   }
 
   if (loading) return <div className="loading"><div className="spinner"/></div>;
@@ -249,8 +261,22 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       </div>
       <div className="quadras-grid">
         {quadras.map(q => (
-          <div key={q.id} className="quadra-card" onClick={() => onSelectQuadra(q)}>
-            <h3 className="quadra-nome">{q.nome}</h3>
+          <div key={q.id} className="quadra-card" onClick={() => editandoQuadra !== q.id && onSelectQuadra(q)}>
+            <div className="quadra-card-header">
+              {editandoQuadra === q.id ? (
+                <input className="input-small" style={{width:'80px', fontSize:'14px'}}
+                  value={nomeEditado}
+                  onChange={e => setNomeEditado(e.target.value)}
+                  onKeyDown={e => { if(e.key==='Enter') salvarNomeQuadra(q); e.stopPropagation(); }}
+                  onClick={e => e.stopPropagation()}
+                  autoFocus />
+              ) : (
+                <h3 className="quadra-nome">{q.nome}</h3>
+              )}
+              <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
+                <PencilIcon />
+              </button>
+            </div>
             <p className="quadra-sub">{q.casasCount} casa{q.casasCount !== 1 ? 's' : ''}</p>
             <ProgressBar value={q.progresso} />
           </div>
