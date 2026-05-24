@@ -188,7 +188,12 @@ function MapaScreen({ territorio, onBack }) {
       )}
       <div className="mapa-container">
         {getEmbedUrl(mapaUrl) ? (
-          <iframe src={getEmbedUrl(mapaUrl)} title="Mapa" className="mapa-iframe" allowFullScreen />
+          <div className="mapa-wrapper">
+            <div className="mapa-overlay-top">
+              <span className="mapa-overlay-titulo">{territorio.nome}</span>
+            </div>
+            <iframe src={getEmbedUrl(mapaUrl)} title="Mapa" className="mapa-iframe" allowFullScreen />
+          </div>
         ) : (
           <div className="mapa-empty">
             <MapIcon /><p>Nenhum mapa configurado</p>
