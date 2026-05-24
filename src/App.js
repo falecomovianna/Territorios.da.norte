@@ -313,12 +313,23 @@ function CasasScreen({ territorio, quadra, onBack }) {
   }
 
   async function moverCasa(casa, direcao) {
-    const doLado = casas.filter(c => c.lado === casa.lado)
+    const doLado = casas
+      .filter(c => c.lado === casa.lado)
       .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+
+    // Garante que todas as casas do lado têm ordem definida
+    for (let i = 0; i < doLado.length; i++) {
+      if (doLado[i].ordem === undefined || doLado[i].ordem === null) {
+        await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', doLado[i].id), { ordem: i });
+        doLado[i].ordem = i;
+      }
+    }
+
     const idx = doLado.findIndex(c => c.id === casa.id);
     const novoIdx = idx + direcao;
     if (novoIdx < 0 || novoIdx >= doLado.length) return;
     const outro = doLado[novoIdx];
+
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
     loadData();
