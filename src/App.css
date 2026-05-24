@@ -543,10 +543,11 @@ body {
 .fileiras-laterais {
   display: flex; justify-content: space-between;
   flex: 1; z-index: 1; position: relative;
-  padding: 4px 0;
-  height: 100%;
 }
-.fileira-lateral {
+.fileira-topo { justify-content: center; }
+.fileira-baixo { justify-content: center; margin-top: 0; }
+
+.fileira-esquerda {
   display: flex; flex-direction: column;
   align-items: center;
   justify-content: space-evenly;
@@ -555,10 +556,14 @@ body {
   border-right: 1px dashed var(--cinza2);
   padding-right: 4px;
 }
-.fileira-lateral.direita {
-  border-right: none;
+.fileira-direita {
+  display: flex; flex-direction: column;
+  align-items: center;
+  justify-content: space-evenly;
+  height: 100%;
+  min-width: 58px;
   border-left: 1px dashed var(--cinza2);
-  padding-right: 0; padding-left: 4px;
+  padding-left: 4px;
 }
 
 .rua-label.vertical {
