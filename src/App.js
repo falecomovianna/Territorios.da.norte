@@ -81,6 +81,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
       data.progresso = totalCasas > 0 ? Math.round((visitadas / totalCasas) * 100) : 0;
       list.push(data);
     }
+    list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
     setTerritorios(list);
     setLoading(false);
   }
@@ -98,7 +99,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
       <div className="header">
         <div className="header-icon"><MapIcon /></div>
         <div>
-          <h1 className="header-title">Meus Territórios</h1>
+          <h1 className="header-title">Territórios da congregação Norte - Navegantes</h1>
           <p className="header-sub">Selecione um território para gerenciar</p>
         </div>
       </div>
@@ -154,6 +155,11 @@ function MapaScreen({ territorio, onBack }) {
 
   function getEmbedUrl(url) {
     if (!url) return null;
+    // Extrai o mid do link e monta o embed correto
+    const midMatch = url.match(/mid=([^&]+)/);
+    if (midMatch) {
+      return `https://www.google.com/maps/d/embed?mid=${midMatch[1]}`;
+    }
     if (url.includes('mymaps.google.com') && !url.includes('/embed'))
       return url.replace('/viewer', '/embed').replace('maps/d/viewer', 'maps/d/embed');
     return url;
