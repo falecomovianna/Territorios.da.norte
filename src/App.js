@@ -559,7 +559,7 @@ export default function App() {
           onSelectMapa={t => { setTerritorioSel(t); setScreen('mapa'); }}
         />
       )}
-      {screen === 'mapa' && <MapaScreen territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
+      {screen === 'mapa' && <MapaScreen key={territorioSel.id} territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
       {screen === 'quadras' && (
         <QuadrasScreen
           territorio={territorioSel}
