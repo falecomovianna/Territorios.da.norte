@@ -207,10 +207,12 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
                 if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition(pos => {
                     const { latitude, longitude } = pos.coords;
-                    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
+                    window.location.href = `https://maps.google.com/?q=${latitude},${longitude}`;
                   }, () => {
-                    window.open('https://www.google.com/maps', '_blank');
+                    window.location.href = 'https://maps.google.com';
                   });
+                } else {
+                  window.location.href = 'https://maps.google.com';
                 }
               }}>
                 📍 Minha localização
