@@ -233,16 +233,12 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
   async function loadQuadras() {
     setLoading(true);
     const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras'));
-    const list = [];
-    for (const d of snap.docs) {
-      const data = { id: d.id, ...d.data() };
-      const casasSnap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', d.id, 'casas'));
-      const total = casasSnap.size;
-      const visitadas = casasSnap.docs.filter(c => c.data().visitada).length;
-      data.casasCount = total;
-      data.progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
-      list.push(data);
-    }
+    const list = snap.docs.map(d => ({
+      id: d.id,
+      ...d.data(),
+      casasCount: d.data().casasCount ?? 0,
+      progresso: d.data().progresso ?? 0
+    }));
     list.sort((a, b) => {
       const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
       const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
@@ -368,7 +364,9 @@ function CasasScreen({ territorio, quadra, onBack }) {
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'), {
       numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
-    setNovoCasaNum(''); setShowAddCasa(null); loadData();
+    setNovoCasaNum(''); setShowAddCasa(null);
+    loadData();
+    atualizarProgresso();
   }
 
   async function moverCasa(casa, direcao) {
@@ -390,19 +388,31 @@ function CasasScreen({ territorio, quadra, onBack }) {
     loadData();
   }
 
+  async function atualizarProgresso() {
+    const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
+    const total = snap.size;
+    const visitadas = snap.docs.filter(c => c.data().visitada).length;
+    const progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
+    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), { casasCount: total, progresso });
+  }
+
   async function confirmarVisita(casa, atendeu) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: true, atendeu });
-    setConfirmCasa(null); loadData();
+    setConfirmCasa(null);
+    loadData();
+    atualizarProgresso();
   }
 
   async function resetarCasa(casa) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: false, atendeu: null });
     loadData();
+    atualizarProgresso();
   }
 
   async function deletarCasa(casa) {
     await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id));
     loadData();
+    atualizarProgresso();
   }
 
   function casasPorLado(lado) {
