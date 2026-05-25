@@ -192,7 +192,9 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
         </div>
       )}
       <div className="mapa-container">
-        {getEmbedUrl(mapaUrl) ? (
+        {loading ? (
+          <div className="mapa-empty"><div className="spinner"/></div>
+        ) : getEmbedUrl(mapaUrl) ? (
           <div className="mapa-wrapper">
             <div className="mapa-overlay-top">
               <span className="mapa-overlay-titulo">{territorio.nome}</span>
