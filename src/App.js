@@ -139,10 +139,18 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
   const [mapaUrl, setMapaUrl] = useState('');
   const [editingUrl, setEditingUrl] = useState(false);
   const [inputUrl, setInputUrl] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    setMapaUrl(territorio.mapaUrl || '');
-    setInputUrl(territorio.mapaUrl || '');
+    async function loadMapa() {
+      setLoading(true);
+      const d = await getDoc(doc(db, 'territorios', territorio.id));
+      const url = d.data()?.mapaUrl || '';
+      setMapaUrl(url);
+      setInputUrl(url);
+      setLoading(false);
+    }
+    loadMapa();
   }, [territorio.id]);
 
   async function salvarUrl() {
