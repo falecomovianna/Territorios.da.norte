@@ -207,12 +207,13 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
                 if (navigator.geolocation) {
                   navigator.geolocation.getCurrentPosition(pos => {
                     const { latitude, longitude } = pos.coords;
-                    window.location.href = `https://maps.google.com/?q=${latitude},${longitude}`;
-                  }, () => {
-                    window.location.href = 'https://maps.google.com';
+                    const a = document.createElement('a');
+                    a.href = `comgooglemaps://?q=${latitude},${longitude}`;
+                    a.click();
+                    setTimeout(() => {
+                      window.location.href = `https://maps.google.com/?q=${latitude},${longitude}`;
+                    }, 500);
                   });
-                } else {
-                  window.location.href = 'https://maps.google.com';
                 }
               }}>
                 📍 Minha localização
