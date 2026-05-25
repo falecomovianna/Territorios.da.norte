@@ -144,10 +144,15 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
   useEffect(() => {
     async function loadMapa() {
       setLoading(true);
-      const d = await getDoc(doc(db, 'territorios', territorio.id));
-      const url = d.data()?.mapaUrl || '';
-      setMapaUrl(url);
-      setInputUrl(url);
+      try {
+        const d = await getDoc(doc(db, 'territorios', territorio.id));
+        const url = d.data()?.mapaUrl || '';
+        setMapaUrl(url);
+        setInputUrl(url);
+      } catch(e) {
+        setMapaUrl('');
+        setInputUrl('');
+      }
       setLoading(false);
     }
     loadMapa();
