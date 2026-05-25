@@ -629,3 +629,18 @@ body {
   width: 100%; height: 100%; border: none;
   display: block;
 }
+
+/* ── BOTÃO LOCALIZAÇÃO ───────────────────────────────────────────────────── */
+.btn-localizacao {
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: 1.5px solid rgba(255,255,255,0.4);
+  border-radius: 8px;
+  padding: 5px 10px;
+  font-family: inherit; font-size: 12px; font-weight: 700;
+  cursor: pointer;
+  margin-left: auto;
+  white-space: nowrap;
+  transition: background 0.15s;
+}
+.btn-localizacao:hover { background: rgba(255,255,255,0.35); }
