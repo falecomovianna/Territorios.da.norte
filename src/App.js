@@ -203,6 +203,18 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
           <div className="mapa-wrapper">
             <div className="mapa-overlay-top">
               <span className="mapa-overlay-titulo">{territorio.nome}</span>
+              <button className="btn-localizacao" onClick={() => {
+                if (navigator.geolocation) {
+                  navigator.geolocation.getCurrentPosition(pos => {
+                    const { latitude, longitude } = pos.coords;
+                    window.open(`https://www.google.com/maps?q=${latitude},${longitude}`, '_blank');
+                  }, () => {
+                    window.open('https://www.google.com/maps', '_blank');
+                  });
+                }
+              }}>
+                📍 Minha localização
+              </button>
             </div>
             <iframe src={getEmbedUrl(mapaUrl)} title="Mapa" className="mapa-iframe" allowFullScreen />
           </div>
