@@ -91,7 +91,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
       <div className="header">
         <div className="header-icon"><MapIcon /></div>
         <div>
-          <h1 className="header-title">Territórios da congregação Norte - Navegantes</h1>
+          <h1 className="header-title">Norte - Navegantes</h1>
           <p className="header-sub">Selecione um território para gerenciar</p>
         </div>
       </div>
@@ -136,10 +136,11 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
 
 // ─── SCREEN 1B: MAPA ──────────────────────────────────────────────────────────
 function MapaScreen({ territorio, onBack, onVerQuadras }) {
-  const [mapaUrl, setMapaUrl] = useState('');
-  const [editingUrl, setEditingUrl] = useState(false);
-  const [inputUrl, setInputUrl] = useState('');
+  const [fotoUrl, setFotoUrl] = useState('');
   const [loading, setLoading] = useState(true);
+  const [editingFoto, setEditingFoto] = useState(false);
+  const [inputUrl, setInputUrl] = useState('');
+  const [verFoto, setVerFoto] = useState(false);
 
   useEffect(() => {
     async function loadMapa() {
@@ -147,91 +148,79 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
       try {
         const d = await getDoc(doc(db, 'territorios', territorio.id));
         const url = d.data()?.mapaUrl || '';
-        setMapaUrl(url);
+        setFotoUrl(url);
         setInputUrl(url);
       } catch(e) {
-        setMapaUrl('');
-        setInputUrl('');
+        setFotoUrl(''); setInputUrl('');
       }
       setLoading(false);
     }
     loadMapa();
   }, [territorio.id]);
 
-  async function salvarUrl() {
+  async function salvarFoto() {
     await updateDoc(doc(db, 'territorios', territorio.id), { mapaUrl: inputUrl });
-    setMapaUrl(inputUrl); setEditingUrl(false);
-  }
-
-  function getEmbedUrl(url) {
-    if (!url) return null;
-    // Extrai o mid do link e monta o embed correto
-    const midMatch = url.match(/mid=([^&]+)/);
-    if (midMatch) {
-      return `https://www.google.com/maps/d/embed?mid=${midMatch[1]}`;
-    }
-    if (url.includes('mymaps.google.com') && !url.includes('/embed'))
-      return url.replace('/viewer', '/embed').replace('maps/d/viewer', 'maps/d/embed');
-    return url;
+    setFotoUrl(inputUrl); setEditingFoto(false);
   }
 
   return (
     <div className="screen">
       <div className="topbar">
         <button className="back-btn" onClick={onBack}><BackIcon /></button>
-        <div><h2 className="topbar-title">{territorio.nome}</h2><p className="topbar-sub">Foto do Mapa</p></div>
-        <button className="icon-btn" onClick={() => setEditingUrl(true)}><PencilIcon /></button>
+        <div><h2 className="topbar-title">{territorio.nome}</h2><p className="topbar-sub">Mapa do Território</p></div>
+        <button className="icon-btn" onClick={() => setEditingFoto(true)}><PencilIcon /></button>
       </div>
-      {editingUrl && (
+
+      {editingFoto && (
         <div className="modal-overlay">
           <div className="modal">
-            <h3 className="modal-title">Link do Google My Maps</h3>
-            <p className="modal-sub">Cole o link de incorporação do seu mapa</p>
-            <input className="input" placeholder="https://www.google.com/maps/d/embed?..."
-              value={inputUrl} onChange={e => setInputUrl(e.target.value)} />
+            <h3 className="modal-title">Link da Foto do Mapa</h3>
+            <p className="modal-sub">Cole o link direto da imagem (JPG, PNG)</p>
+            <input className="input" placeholder="https://..." value={inputUrl} onChange={e => setInputUrl(e.target.value)} />
             <div className="modal-actions">
-              <button className="btn-ghost" onClick={() => setEditingUrl(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={salvarUrl}>Salvar</button>
+              <button className="btn-ghost" onClick={() => setEditingFoto(false)}>Cancelar</button>
+              <button className="btn-primary" onClick={salvarFoto}>Salvar</button>
             </div>
           </div>
         </div>
       )}
-      <div className="mapa-container">
+
+      {/* Visualizador fullscreen deitado */}
+      {verFoto && (
+        <div className="foto-fullscreen" onClick={() => setVerFoto(false)}>
+          <div className="foto-fullscreen-inner" onClick={e => e.stopPropagation()}>
+            <button className="foto-fechar" onClick={() => setVerFoto(false)}>✕</button>
+            <img src={fotoUrl} alt="Mapa" className="foto-zoom-img" />
+          </div>
+        </div>
+      )}
+
+      <div className="mapa-foto-container">
         {loading ? (
           <div className="mapa-empty"><div className="spinner"/></div>
-        ) : getEmbedUrl(mapaUrl) ? (
-          <div className="mapa-wrapper">
+        ) : fotoUrl ? (
+          <div className="mapa-foto-wrapper" onClick={() => setVerFoto(true)}>
             <div className="mapa-overlay-top">
               <span className="mapa-overlay-titulo">{territorio.nome}</span>
-              <button className="btn-localizacao" onClick={() => {
-                if (navigator.geolocation) {
-                  navigator.geolocation.getCurrentPosition(pos => {
-                    const { latitude, longitude } = pos.coords;
-                    const a = document.createElement('a');
-                    a.href = `comgooglemaps://?q=${latitude},${longitude}`;
-                    a.click();
-                    setTimeout(() => {
-                      window.location.href = `https://maps.google.com/?q=${latitude},${longitude}`;
-                    }, 500);
-                  });
-                }
-              }}>
-                📍 Minha localização
-              </button>
+              <span className="mapa-overlay-hint">🔍 Toque para ampliar</span>
             </div>
-            <iframe src={getEmbedUrl(mapaUrl)} title="Mapa" className="mapa-iframe" allowFullScreen />
+            <img src={fotoUrl} alt="Mapa do território" className="mapa-foto-preview" />
           </div>
         ) : (
           <div className="mapa-empty">
-            <MapIcon /><p>Nenhum mapa configurado</p>
-            <button className="btn-primary" onClick={() => setEditingUrl(true)}>Adicionar Link</button>
+            <MapIcon /><p>Nenhuma foto configurada</p>
+            <button className="btn-primary" onClick={() => setEditingFoto(true)}>Adicionar Foto</button>
           </div>
         )}
       </div>
+
       <button className="btn-full" onClick={onVerQuadras}>Ver Quadras para Marcar Casas</button>
     </div>
   );
 }
+
+
+
 
 // ─── SCREEN 2: QUADRAS ────────────────────────────────────────────────────────
 function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
