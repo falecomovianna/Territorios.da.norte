@@ -283,10 +283,15 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       <div className="topbar">
         <button className="back-btn" onClick={onBack}><BackIcon /></button>
         <div>
-          <h2 className="topbar-title topbar-title-grande">{territorio.nome}</h2>
+          <h2 className="topbar-title topbar-territorio">{territorio.nome}</h2>
           <p className="topbar-sub">{quadras.length} Quadras</p>
         </div>
-        <button className={`icon-btn ${editMode ? 'active' : ''}`} onClick={() => { setEditMode(!editMode); setEditandoQuadra(null); }}>
+        <button className={`icon-btn ${editMode ? 'active' : ''}`} onClick={() => {
+          if (editMode) { setEditMode(false); setEditandoQuadra(null); return; }
+          const senha = prompt('Digite a senha para editar:');
+          if (senha === '8318') { setEditMode(true); }
+          else if (senha !== null) { alert('Senha incorreta!'); }
+        }}>
           <PencilIcon />
         </button>
       </div>
@@ -493,10 +498,30 @@ function CasasScreen({ territorio, quadra, onBack }) {
           <p className="topbar-sub">{territorio.nome}</p>
         </div>
         <button className={`icon-btn ${editMode ? 'active' : ''}`}
-          onClick={() => editMode ? salvarEdicao() : setEditMode(true)}>
+          onClick={() => {
+            if (editMode) { salvarEdicao(); return; }
+            const senha = prompt('Digite a senha para editar:');
+            if (senha === '8318') { setEditMode(true); }
+            else if (senha !== null) { alert('Senha incorreta!'); }
+          }}>
           {editMode ? '✓' : <PencilIcon />}
         </button>
       </div>
+      {editMode && (
+        <div className="barra-edit">
+          <button className="btn-limpar-visitas" onClick={async () => {
+            if (!window.confirm('Limpar todas as visitas desta quadra? Os números serão mantidos.')) return;
+            const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
+            for (const d of snap.docs) {
+              await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', d.id), { visitada: false, atendeu: null });
+            }
+            atualizarProgresso();
+            loadData();
+          }}>
+            🔄 Limpar Visitas
+          </button>
+        </div>
+      )}
 
       {/* ── LAYOUT DA QUADRA ── */}
       <div className="quadra-wrap">
