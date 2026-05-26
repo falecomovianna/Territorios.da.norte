@@ -644,3 +644,49 @@ body {
   transition: background 0.15s;
 }
 .btn-localizacao:hover { background: rgba(255,255,255,0.35); }
+
+/* ── TERRITÓRIO DESTAQUE ─────────────────────────────────────────────────── */
+.topbar-territorio {
+  font-size: 22px; font-weight: 900;
+  color: var(--azul);
+}
+
+/* ── BARRA EDIÇÃO COM LIMPAR ─────────────────────────────────────────────── */
+.barra-edit {
+  padding: 8px 16px;
+  background: #fff8f0;
+  border-bottom: 1px solid #ffe4c4;
+  display: flex; gap: 10px;
+}
+.btn-limpar-visitas {
+  background: #fff;
+  color: #e67e22;
+  border: 1.5px solid #e67e22;
+  border-radius: 10px;
+  padding: 8px 16px;
+  font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.btn-limpar-visitas:hover { background: #fff3e0; }
+
+/* ── QUADRA ADAPTÁVEL ────────────────────────────────────────────────────── */
+.quadra-box {
+  flex: 1;
+  background: #f8fafc;
+  border: 2px solid var(--cinza2);
+  border-radius: 16px;
+  padding: 10px;
+  min-height: 300px;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.fileira-topo, .fileira-baixo {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  justify-content: center;
+  z-index: 1; position: relative;
+  padding: 4px 0;
+  min-height: 54px; align-items: center;
+}
+.fileira-topo { border-bottom: 1px dashed var(--cinza2); }
+.fileira-baixo { border-top: 1px dashed var(--cinza2); margin-top: auto; }
