@@ -241,7 +241,9 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
       id: d.id,
       ...d.data(),
       casasCount: d.data().casasCount ?? 0,
-      progresso: d.data().progresso ?? 0
+      progresso: d.data().progresso ?? 0,
+      visitadas: d.data().visitadas ?? 0,
+      naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
     }));
     list.sort((a, b) => {
       const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
@@ -311,7 +313,10 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
                 )}
               </div>
             )}
-            <p className="quadra-sub">{q.casasCount} casa{q.casasCount !== 1 ? 's' : ''}</p>
+            <div className="quadra-contadores">
+              <span className="contador-vermelho">🔴 {q.naoVisitadas}</span>
+              <span className="contador-verde">🟢 {q.visitadas}</span>
+            </div>
             <ProgressBar value={q.progresso} />
           </div>
         ))}
@@ -401,8 +406,14 @@ function CasasScreen({ territorio, quadra, onBack }) {
     const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
     const total = snap.size;
     const visitadas = snap.docs.filter(c => c.data().visitada).length;
+    const naoVisitadas = total - visitadas;
     const progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
-    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), { casasCount: total, progresso });
+    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), {
+      casasCount: total,
+      progresso,
+      visitadas,
+      naoVisitadas
+    });
   }
 
   async function confirmarVisita(casa, atendeu) {
@@ -596,6 +607,11 @@ export default function App() {
   const [screen, setScreen] = useState('territorios');
   const [territorioSel, setTerritorioSel] = useState(null);
   const [quadraSel, setQuadraSel] = useState(null);
+
+  // Requisição fantasma: acorda o Firebase ao abrir o app
+  useEffect(() => {
+    getDocs(collection(db, 'territorios')).catch(() => {});
+  }, []);
 
   return (
     <div className="app">
