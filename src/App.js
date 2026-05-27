@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { db } from './firebase';
 import {
   collection, doc, getDocs, getDoc,
-  addDoc, updateDoc, deleteDoc
+  addDoc, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
 import './App.css';
 
@@ -62,26 +62,25 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
 
-  useEffect(() => { loadTerritorios(); }, []);
-
-  async function loadTerritorios() {
-    setLoading(true);
-    const snap = await getDocs(collection(db, 'territorios'));
-    const list = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      quadrasCount: 0,
-      progresso: d.data().progresso ?? 0
-    }));
-    list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
-    setTerritorios(list);
-    setLoading(false);
-  }
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'territorios'), snap => {
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        quadrasCount: 0,
+        progresso: d.data().progresso ?? 0
+      }));
+      list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
+      setTerritorios(list);
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
 
   async function addTerritorio() {
     if (!novoNome.trim()) return;
     await addDoc(collection(db, 'territorios'), { nome: novoNome.trim(), mapaUrl: '' });
-    setNovoNome(''); setShowAdd(false); loadTerritorios();
+    setNovoNome(''); setShowAdd(false);
   }
 
   if (loading) return <div className="loading"><div className="spinner"/></div>;
@@ -185,7 +184,6 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
         </div>
       )}
 
-      {/* Visualizador fullscreen deitado */}
       {verFoto && (
         <div className="foto-fullscreen" onClick={() => setVerFoto(false)}>
           <div className="foto-fullscreen-inner" onClick={e => e.stopPropagation()}>
@@ -219,9 +217,6 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
   );
 }
 
-
-
-
 // ─── SCREEN 2: QUADRAS ────────────────────────────────────────────────────────
 function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
   const [quadras, setQuadras] = useState([]);
@@ -232,39 +227,39 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
   const [editandoQuadra, setEditandoQuadra] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
 
-  useEffect(() => { loadQuadras(); }, []);
-
-  async function loadQuadras() {
-    setLoading(true);
-    const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras'));
-    const list = snap.docs.map(d => ({
-      id: d.id,
-      ...d.data(),
-      casasCount: d.data().casasCount ?? 0,
-      progresso: d.data().progresso ?? 0,
-      visitadas: d.data().visitadas ?? 0,
-      naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
-    }));
-    list.sort((a, b) => {
-      const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
-      const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
-      return numA - numB;
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'territorios', territorio.id, 'quadras'), snap => {
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        casasCount: d.data().casasCount ?? 0,
+        progresso: d.data().progresso ?? 0,
+        visitadas: d.data().visitadas ?? 0,
+        naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
+      }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      setQuadras(list);
+      setLoading(false);
     });
-    setQuadras(list); setLoading(false);
-  }
+    return () => unsub();
+  }, [territorio.id]);
 
   async function addQuadra() {
     if (!novoNome.trim()) return;
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras'), {
       nome: novoNome.trim(), ruas: { topo: '', baixo: '', esquerda: '', direita: '' }
     });
-    setNovoNome(''); setShowAdd(false); loadQuadras();
+    setNovoNome(''); setShowAdd(false);
   }
 
   async function salvarNomeQuadra(q) {
     if (!nomeEditado.trim()) return;
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', q.id), { nome: nomeEditado.trim() });
-    setEditandoQuadra(null); loadQuadras();
+    setEditandoQuadra(null);
   }
 
   if (loading) return <div className="loading"><div className="spinner"/></div>;
@@ -349,19 +344,25 @@ function CasasScreen({ territorio, quadra, onBack }) {
   const [novoCasaNum, setNovoCasaNum] = useState('');
   const [editRuas, setEditRuas] = useState({ topo: '', baixo: '', esquerda: '', direita: '' });
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    // Carrega ruas do documento da quadra
+    getDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id)).then(d => {
+      const r = d.data()?.ruas || { topo: '', baixo: '', esquerda: '', direita: '' };
+      setRuas(r); setEditRuas(r);
+    });
 
-  async function loadData() {
-    setLoading(true);
-    const quadraDoc = await getDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id));
-    const q = quadraDoc.data();
-    const r = q.ruas || { topo: '', baixo: '', esquerda: '', direita: '' };
-    setRuas(r); setEditRuas(r);
-    const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
-    const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
-    setCasas(list); setLoading(false);
-  }
+    // onSnapshot para casas — conexão aberta, sem delay
+    const unsub = onSnapshot(
+      collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'),
+      snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
+        setCasas(list);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, [territorio.id, quadra.id]);
 
   async function salvarEdicao() {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), { ruas: editRuas });
@@ -379,7 +380,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
       numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
     setNovoCasaNum(''); setShowAddCasa(null);
-    loadData();
     atualizarProgresso();
   }
 
@@ -399,40 +399,36 @@ function CasasScreen({ territorio, quadra, onBack }) {
     const outro = doLado[novoIdx];
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
-    loadData();
   }
 
-  async function atualizarProgresso() {
-    const snap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'));
-    const total = snap.size;
-    const visitadas = snap.docs.filter(c => c.data().visitada).length;
+  async function atualizarProgresso(casasSnap) {
+    const total = casasSnap ? casasSnap.length : casas.length;
+    const lista = casasSnap || casas;
+    const visitadas = lista.filter(c => c.visitada).length;
     const naoVisitadas = total - visitadas;
     const progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), {
-      casasCount: total,
-      progresso,
-      visitadas,
-      naoVisitadas
+      casasCount: total, progresso, visitadas, naoVisitadas
     });
   }
 
   async function confirmarVisita(casa, atendeu) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: true, atendeu });
     setConfirmCasa(null);
-    loadData();
-    atualizarProgresso();
+    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: true, atendeu } : c);
+    atualizarProgresso(novaLista);
   }
 
   async function resetarCasa(casa) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: false, atendeu: null });
-    loadData();
-    atualizarProgresso();
+    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: false, atendeu: null } : c);
+    atualizarProgresso(novaLista);
   }
 
   async function deletarCasa(casa) {
     await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id));
-    loadData();
-    atualizarProgresso();
+    const novaLista = casas.filter(c => c.id !== casa.id);
+    atualizarProgresso(novaLista);
   }
 
   function casasPorLado(lado) {
@@ -515,8 +511,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
             for (const d of snap.docs) {
               await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', d.id), { visitada: false, atendeu: null });
             }
-            atualizarProgresso();
-            loadData();
+            atualizarProgresso(casas.map(c => ({ ...c, visitada: false, atendeu: null })));
           }}>
             🔄 Limpar Visitas
           </button>
@@ -607,11 +602,6 @@ export default function App() {
   const [screen, setScreen] = useState('territorios');
   const [territorioSel, setTerritorioSel] = useState(null);
   const [quadraSel, setQuadraSel] = useState(null);
-
-  // Requisição fantasma: acorda o Firebase ao abrir o app
-  useEffect(() => {
-    getDocs(collection(db, 'territorios')).catch(() => {});
-  }, []);
 
   return (
     <div className="app">
