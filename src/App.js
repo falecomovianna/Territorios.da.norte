@@ -376,7 +376,6 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
               <span className="contador-vermelho">🔴 {q.naoVisitadas}</span>
               <span className="contador-verde">🟢 {q.visitadas}</span>
             </div>
-            <ProgressBar value={q.progresso} />
           </div>
         ))}
         {showAdd ? (
