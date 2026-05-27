@@ -155,14 +155,8 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
                     )}
                   </div>
                 )}
-                <p className="card-sub">{t.quadrasCount} Quadra{t.quadrasCount !== 1 ? 's' : ''}</p>
               </div>
             </div>
-            <div className="card-progress-row">
-              <span className="card-progress-label">Progresso</span>
-              <span className="card-progress-pct">{t.progresso}%</span>
-            </div>
-            <ProgressBar value={t.progresso} />
             {!editMode && (
               <div className="card-actions">
                 <button className="btn-secondary" onClick={() => onSelectMapa(t)}><MapIcon /> Mapa</button>
