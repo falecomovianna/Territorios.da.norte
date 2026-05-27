@@ -61,6 +61,9 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
   const [loading, setLoading] = useState(true);
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [editandoTerritorio, setEditandoTerritorio] = useState(null);
+  const [nomeEditado, setNomeEditado] = useState('');
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'territorios'), snap => {
@@ -70,7 +73,11 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
         quadrasCount: 0,
         progresso: d.data().progresso ?? 0
       }));
-      list.sort((a, b) => a.nome.localeCompare(b.nome, 'pt', { numeric: true }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
       setTerritorios(list);
       setLoading(false);
     });
@@ -83,24 +90,71 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
     setNovoNome(''); setShowAdd(false);
   }
 
+  async function salvarNomeTerritorio(t) {
+    if (!nomeEditado.trim()) return;
+    await updateDoc(doc(db, 'territorios', t.id), { nome: nomeEditado.trim() });
+    setEditandoTerritorio(null);
+  }
+
+  async function deletarTerritorio(t) {
+    if (!window.confirm(`Excluir "${t.nome}"? Todos os dados serão perdidos!`)) return;
+    const quadrasSnap = await getDocs(collection(db, 'territorios', t.id, 'quadras'));
+    for (const q of quadrasSnap.docs) {
+      const casasSnap = await getDocs(collection(db, 'territorios', t.id, 'quadras', q.id, 'casas'));
+      for (const c of casasSnap.docs) {
+        await deleteDoc(doc(db, 'territorios', t.id, 'quadras', q.id, 'casas', c.id));
+      }
+      await deleteDoc(doc(db, 'territorios', t.id, 'quadras', q.id));
+    }
+    await deleteDoc(doc(db, 'territorios', t.id));
+  }
+
   if (loading) return <div className="loading"><div className="spinner"/></div>;
 
   return (
     <div className="screen">
       <div className="header">
         <div className="header-icon"><MapIcon /></div>
-        <div>
+        <div style={{flex:1}}>
           <h1 className="header-title">Norte - Navegantes</h1>
           <p className="header-sub">Selecione um território para gerenciar</p>
         </div>
+        <button className={`icon-btn ${editMode ? 'active' : ''}`} style={{marginLeft:'auto'}} onClick={() => {
+          if (editMode) { setEditMode(false); setEditandoTerritorio(null); return; }
+          const senha = prompt('Digite a senha para editar:');
+          if (senha === '8318') { setEditMode(true); }
+          else if (senha !== null) { alert('Senha incorreta!'); }
+        }}>
+          <PencilIcon />
+        </button>
       </div>
       <div className="list">
         {territorios.map(t => (
           <div key={t.id} className="card">
             <div className="card-header-row">
               <div className="card-pin">📍</div>
-              <div className="card-info">
-                <h2 className="card-title">{t.nome}</h2>
+              <div className="card-info" style={{flex:1}}>
+                {editMode && editandoTerritorio === t.id ? (
+                  <div style={{display:'flex', gap:'6px', alignItems:'center'}}>
+                    <input className="input-small" style={{flex:1, fontSize:'15px', fontWeight:'800'}}
+                      value={nomeEditado}
+                      onChange={e => setNomeEditado(e.target.value)}
+                      onKeyDown={e => { if(e.key==='Enter') salvarNomeTerritorio(t); }}
+                      autoFocus />
+                    <button className="btn-tiny" onClick={() => salvarNomeTerritorio(t)}>✓</button>
+                    <button className="btn-tiny ghost" onClick={() => setEditandoTerritorio(null)}>✕</button>
+                  </div>
+                ) : (
+                  <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                    <h2 className="card-title">{t.nome}</h2>
+                    {editMode && (
+                      <>
+                        <button className="btn-lapis-quadra" onClick={() => { setEditandoTerritorio(t.id); setNomeEditado(t.nome); }}><PencilIcon /></button>
+                        <button className="btn-lapis-quadra" style={{color:'#ef4444'}} onClick={() => deletarTerritorio(t)}><TrashIcon /></button>
+                      </>
+                    )}
+                  </div>
+                )}
                 <p className="card-sub">{t.quadrasCount} Quadra{t.quadrasCount !== 1 ? 's' : ''}</p>
               </div>
             </div>
@@ -109,15 +163,17 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
               <span className="card-progress-pct">{t.progresso}%</span>
             </div>
             <ProgressBar value={t.progresso} />
-            <div className="card-actions">
-              <button className="btn-secondary" onClick={() => onSelectMapa(t)}><MapIcon /> Mapa</button>
-              <button className="btn-primary" onClick={() => onSelectTerritorio(t)}><GridIcon /> Quadras</button>
-            </div>
+            {!editMode && (
+              <div className="card-actions">
+                <button className="btn-secondary" onClick={() => onSelectMapa(t)}><MapIcon /> Mapa</button>
+                <button className="btn-primary" onClick={() => onSelectTerritorio(t)}><GridIcon /> Quadras</button>
+              </div>
+            )}
           </div>
         ))}
         {showAdd ? (
           <div className="add-form">
-            <input className="input" placeholder="Nome do território (ex: Território Nº 5)"
+            <input className="input" placeholder="Nome do território (ex: N 01)"
               value={novoNome} onChange={e => setNovoNome(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && addTerritorio()} autoFocus />
             <div className="add-form-actions">
@@ -126,7 +182,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
             </div>
           </div>
         ) : (
-          <button className="btn-add" onClick={() => setShowAdd(true)}><PlusIcon /> Novo Território</button>
+          !editMode && <button className="btn-add" onClick={() => setShowAdd(true)}><PlusIcon /> Novo Território</button>
         )}
       </div>
     </div>
@@ -262,6 +318,15 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
     setEditandoQuadra(null);
   }
 
+  async function deletarQuadra(q) {
+    if (!window.confirm(`Excluir "${q.nome}"? Todas as casas serão apagadas!`)) return;
+    const casasSnap = await getDocs(collection(db, 'territorios', territorio.id, 'quadras', q.id, 'casas'));
+    for (const c of casasSnap.docs) {
+      await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', q.id, 'casas', c.id));
+    }
+    await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', q.id));
+  }
+
   if (loading) return <div className="loading"><div className="spinner"/></div>;
 
   return (
@@ -302,9 +367,14 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
               <div className="quadra-card-header">
                 <h3 className="quadra-nome">{q.nome}</h3>
                 {editMode && (
-                  <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
-                    <PencilIcon />
-                  </button>
+                  <div style={{display:'flex', gap:'4px'}}>
+                    <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
+                      <PencilIcon />
+                    </button>
+                    <button className="btn-lapis-quadra" style={{color:'#ef4444'}} onClick={e => { e.stopPropagation(); deletarQuadra(q); }}>
+                      <TrashIcon />
+                    </button>
+                  </div>
                 )}
               </div>
             )}
