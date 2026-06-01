@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from './firebase';
 import {
-  collection, doc, getDocs, getDoc,
+  collection, doc, getDocs,
   addDoc, updateDoc, deleteDoc, onSnapshot
 } from 'firebase/firestore';
 import './App.css';
@@ -70,7 +70,6 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
       const list = snap.docs.map(d => ({
         id: d.id,
         ...d.data(),
-        quadrasCount: 0,
         progresso: d.data().progresso ?? 0
       }));
       list.sort((a, b) => {
@@ -185,27 +184,10 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
 
 // ─── SCREEN 1B: MAPA ──────────────────────────────────────────────────────────
 function MapaScreen({ territorio, onBack, onVerQuadras }) {
-  const [fotoUrl, setFotoUrl] = useState('');
-  const [loading, setLoading] = useState(true);
+  const [fotoUrl, setFotoUrl] = useState(territorio.mapaUrl || '');
   const [editingFoto, setEditingFoto] = useState(false);
-  const [inputUrl, setInputUrl] = useState('');
+  const [inputUrl, setInputUrl] = useState(territorio.mapaUrl || '');
   const [verFoto, setVerFoto] = useState(false);
-
-  useEffect(() => {
-    async function loadMapa() {
-      setLoading(true);
-      try {
-        const d = await getDoc(doc(db, 'territorios', territorio.id));
-        const url = d.data()?.mapaUrl || '';
-        setFotoUrl(url);
-        setInputUrl(url);
-      } catch(e) {
-        setFotoUrl(''); setInputUrl('');
-      }
-      setLoading(false);
-    }
-    loadMapa();
-  }, [territorio.id]);
 
   async function salvarFoto() {
     await updateDoc(doc(db, 'territorios', territorio.id), { mapaUrl: inputUrl });
@@ -244,9 +226,7 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
       )}
 
       <div className="mapa-foto-container">
-        {loading ? (
-          <div className="mapa-empty"><div className="spinner"/></div>
-        ) : fotoUrl ? (
+        {fotoUrl ? (
           <div className="mapa-foto-wrapper" onClick={() => setVerFoto(true)}>
             <div className="mapa-overlay-top">
               <span className="mapa-overlay-titulo">{territorio.nome}</span>
@@ -399,22 +379,16 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
 // ─── SCREEN 3: CASAS ──────────────────────────────────────────────────────────
 function CasasScreen({ territorio, quadra, onBack }) {
   const [casas, setCasas] = useState([]);
-  const [ruas, setRuas] = useState({ topo: '', baixo: '', esquerda: '', direita: '' });
+  const [ruas, setRuas] = useState(quadra.ruas || { topo: '', baixo: '', esquerda: '', direita: '' });
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [confirmCasa, setConfirmCasa] = useState(null);
   const [showAddCasa, setShowAddCasa] = useState(null);
   const [novoCasaNum, setNovoCasaNum] = useState('');
-  const [editRuas, setEditRuas] = useState({ topo: '', baixo: '', esquerda: '', direita: '' });
+  const [editRuas, setEditRuas] = useState(quadra.ruas || { topo: '', baixo: '', esquerda: '', direita: '' });
 
   useEffect(() => {
-    // Carrega ruas do documento da quadra
-    getDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id)).then(d => {
-      const r = d.data()?.ruas || { topo: '', baixo: '', esquerda: '', direita: '' };
-      setRuas(r); setEditRuas(r);
-    });
-
-    // onSnapshot para casas — conexão aberta, sem delay
+    // onSnapshot para casas — sem requisição separada para ruas
     const unsub = onSnapshot(
       collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'),
       snap => {
@@ -427,6 +401,18 @@ function CasasScreen({ territorio, quadra, onBack }) {
     return () => unsub();
   }, [territorio.id, quadra.id]);
 
+  // useMemo: casas por lado calculadas uma vez por render
+  const casasPorLadoMemo = useMemo(() => {
+    const resultado = { topo: [], baixo: [], esquerda: [], direita: [] };
+    for (const c of casas) {
+      if (resultado[c.lado]) resultado[c.lado].push(c);
+    }
+    for (const lado of Object.keys(resultado)) {
+      resultado[lado].sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    }
+    return resultado;
+  }, [casas]);
+
   async function salvarEdicao() {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id), { ruas: editRuas });
     setRuas(editRuas); setEditMode(false);
@@ -434,8 +420,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
 
   async function addCasa(lado, posicao) {
     if (!novoCasaNum.trim()) return;
-    const casasDoLado = casas.filter(c => c.lado === lado)
-      .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    const casasDoLado = casasPorLadoMemo[lado] || [];
     for (let i = posicao; i < casasDoLado.length; i++) {
       await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casasDoLado[i].id), { ordem: i + 1 });
     }
@@ -443,17 +428,16 @@ function CasasScreen({ territorio, quadra, onBack }) {
       numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
     setNovoCasaNum(''); setShowAddCasa(null);
-    atualizarProgresso();
+    const novaLista = [...casas, { numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao }];
+    atualizarProgresso(novaLista);
   }
 
   async function moverCasa(casa, direcao) {
-    const doLado = casas
-      .filter(c => c.lado === casa.lado)
-      .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    const doLado = [...(casasPorLadoMemo[casa.lado] || [])];
     for (let i = 0; i < doLado.length; i++) {
       if (doLado[i].ordem === undefined || doLado[i].ordem === null) {
         await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', doLado[i].id), { ordem: i });
-        doLado[i].ordem = i;
+        doLado[i] = { ...doLado[i], ordem: i };
       }
     }
     const idx = doLado.findIndex(c => c.id === casa.id);
@@ -464,9 +448,8 @@ function CasasScreen({ territorio, quadra, onBack }) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
   }
 
-  async function atualizarProgresso(casasSnap) {
-    const total = casasSnap ? casasSnap.length : casas.length;
-    const lista = casasSnap || casas;
+  async function atualizarProgresso(lista) {
+    const total = lista.length;
     const visitadas = lista.filter(c => c.visitada).length;
     const naoVisitadas = total - visitadas;
     const progresso = total > 0 ? Math.round((visitadas / total) * 100) : 0;
@@ -478,25 +461,17 @@ function CasasScreen({ territorio, quadra, onBack }) {
   async function confirmarVisita(casa, atendeu) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: true, atendeu });
     setConfirmCasa(null);
-    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: true, atendeu } : c);
-    atualizarProgresso(novaLista);
+    atualizarProgresso(casas.map(c => c.id === casa.id ? { ...c, visitada: true, atendeu } : c));
   }
 
   async function resetarCasa(casa) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: false, atendeu: null });
-    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: false, atendeu: null } : c);
-    atualizarProgresso(novaLista);
+    atualizarProgresso(casas.map(c => c.id === casa.id ? { ...c, visitada: false, atendeu: null } : c));
   }
 
   async function deletarCasa(casa) {
     await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id));
-    const novaLista = casas.filter(c => c.id !== casa.id);
-    atualizarProgresso(novaLista);
-  }
-
-  function casasPorLado(lado) {
-    return casas.filter(c => c.lado === lado)
-      .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
+    atualizarProgresso(casas.filter(c => c.id !== casa.id));
   }
 
   function BtnInserir({ lado, posicao }) {
@@ -519,7 +494,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
   }
 
   function renderFileiraCasas(lado) {
-    const list = casasPorLado(lado);
+    const list = casasPorLadoMemo[lado] || [];
     return (
       <div className={`fileira fileira-${lado}`}>
         {editMode && <BtnInserir lado={lado} posicao={0} />}
@@ -541,7 +516,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
             {editMode && <BtnInserir lado={lado} posicao={idx + 1} />}
           </React.Fragment>
         ))}
-        {list.length === 0 && !editMode && null}
       </div>
     );
   }
@@ -581,44 +555,30 @@ function CasasScreen({ territorio, quadra, onBack }) {
         </div>
       )}
 
-      {/* ── LAYOUT DA QUADRA ── */}
       <div className="quadra-wrap">
-
-        {/* Rua de cima */}
         <div className="rua-label-wrap rua-topo-wrap">
           {editMode
             ? <input className="input-rua" value={editRuas.topo} onChange={e => setEditRuas({...editRuas, topo: e.target.value})} placeholder="Rua de cima" />
             : ruas.topo && <span className="rua-label">{ruas.topo.toUpperCase()}</span>}
         </div>
 
-        {/* Linha do meio: rua esq + quadra + rua dir */}
         <div className="quadra-linha-meio">
-
-          {/* Rua esquerda */}
           <div className="rua-label-wrap rua-lado-wrap">
             {editMode
               ? <input className="input-rua vertical" value={editRuas.esquerda} onChange={e => setEditRuas({...editRuas, esquerda: e.target.value})} placeholder="Esq." />
               : ruas.esquerda && <span className="rua-label vertical">{ruas.esquerda.toUpperCase()}</span>}
           </div>
 
-          {/* Quadra */}
           <div className="quadra-box">
             <div className="quadra-label-bg">{quadra.nome}</div>
-
-            {/* Casas do topo */}
             {renderFileiraCasas('topo')}
-
-            {/* Casas esquerda e direita lado a lado */}
             <div className="fileiras-laterais">
               {renderFileiraCasas('esquerda')}
               {renderFileiraCasas('direita')}
             </div>
-
-            {/* Casas do baixo */}
             {renderFileiraCasas('baixo')}
           </div>
 
-          {/* Rua direita */}
           <div className="rua-label-wrap rua-lado-wrap">
             {editMode
               ? <input className="input-rua vertical" value={editRuas.direita} onChange={e => setEditRuas({...editRuas, direita: e.target.value})} placeholder="Dir." />
@@ -626,16 +586,13 @@ function CasasScreen({ territorio, quadra, onBack }) {
           </div>
         </div>
 
-        {/* Rua de baixo */}
         <div className="rua-label-wrap rua-baixo-wrap">
           {editMode
             ? <input className="input-rua" value={editRuas.baixo} onChange={e => setEditRuas({...editRuas, baixo: e.target.value})} placeholder="Rua de baixo" />
             : ruas.baixo && <span className="rua-label">{ruas.baixo.toUpperCase()}</span>}
         </div>
-
       </div>
 
-      {/* Modal confirmar visita */}
       {confirmCasa && (
         <div className="modal-overlay">
           <div className="modal">
