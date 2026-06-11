@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from './firebase';
 import {
   collection, doc, getDocs,
@@ -386,12 +386,19 @@ function CasasScreen({ territorio, quadra, onBack }) {
   const [showAddCasa, setShowAddCasa] = useState(null);
   const [novoCasaNum, setNovoCasaNum] = useState('');
   const [editRuas, setEditRuas] = useState(quadra.ruas || { topo: '', baixo: '', esquerda: '', direita: '' });
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   useEffect(() => {
     // onSnapshot para casas — sem requisição separada para ruas
     const unsub = onSnapshot(
       collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'),
       snap => {
+        if (!mountedRef.current) return;
         const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
         setCasas(list);
@@ -449,6 +456,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
   }
 
   async function atualizarProgresso(lista) {
+    if (!mountedRef.current) return;
     const total = lista.length;
     const visitadas = lista.filter(c => c.visitada).length;
     const naoVisitadas = total - visitadas;
@@ -632,13 +640,15 @@ export default function App() {
         />
       )}
       {screen === 'mapa' && <MapaScreen key={territorioSel.id} territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
-      {screen === 'quadras' && (
-        <QuadrasScreen
-          territorio={territorioSel}
-          onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
-          onBack={() => setScreen('territorios')}
-        />
-      )}
+      <div style={{ display: screen === 'quadras' ? 'block' : 'none' }}>
+        {territorioSel && (
+          <QuadrasScreen
+            territorio={territorioSel}
+            onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
+            onBack={() => setScreen('territorios')}
+          />
+        )}
+      </div>
       {screen === 'casas' && <CasasScreen territorio={territorioSel} quadra={quadraSel} onBack={() => setScreen('quadras')} />}
     </div>
   );
