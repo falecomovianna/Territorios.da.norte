@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { db } from './firebase';
 import {
   collection, doc, getDocs,
-  addDoc, updateDoc, deleteDoc, onSnapshot
+  addDoc, updateDoc, deleteDoc, onSnapshot, writeBatch
 } from 'firebase/firestore';
 import './App.css';
 
@@ -428,9 +428,11 @@ function CasasScreen({ territorio, quadra, onBack }) {
   async function addCasa(lado, posicao) {
     if (!novoCasaNum.trim()) return;
     const casasDoLado = casasPorLadoMemo[lado] || [];
+    const batch = writeBatch(db);
     for (let i = posicao; i < casasDoLado.length; i++) {
-      await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casasDoLado[i].id), { ordem: i + 1 });
+      batch.update(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casasDoLado[i].id), { ordem: i + 1 });
     }
+    await batch.commit();
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'), {
       numero: novoCasaNum.trim(), lado, visitada: false, atendeu: null, ordem: posicao
     });
@@ -441,18 +443,20 @@ function CasasScreen({ territorio, quadra, onBack }) {
 
   async function moverCasa(casa, direcao) {
     const doLado = [...(casasPorLadoMemo[casa.lado] || [])];
+    const batch = writeBatch(db);
     for (let i = 0; i < doLado.length; i++) {
       if (doLado[i].ordem === undefined || doLado[i].ordem === null) {
-        await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', doLado[i].id), { ordem: i });
+        batch.update(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', doLado[i].id), { ordem: i });
         doLado[i] = { ...doLado[i], ordem: i };
       }
     }
     const idx = doLado.findIndex(c => c.id === casa.id);
     const novoIdx = idx + direcao;
-    if (novoIdx < 0 || novoIdx >= doLado.length) return;
+    if (novoIdx < 0 || novoIdx >= doLado.length) { await batch.commit(); return; }
     const outro = doLado[novoIdx];
-    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
-    await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
+    batch.update(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { ordem: novoIdx });
+    batch.update(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', outro.id), { ordem: idx });
+    await batch.commit();
   }
 
   async function atualizarProgresso(lista) {
@@ -469,12 +473,14 @@ function CasasScreen({ territorio, quadra, onBack }) {
   async function confirmarVisita(casa, atendeu) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: true, atendeu });
     setConfirmCasa(null);
-    atualizarProgresso(casas.map(c => c.id === casa.id ? { ...c, visitada: true, atendeu } : c));
+    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: true, atendeu } : c);
+    atualizarProgresso(novaLista);
   }
 
   async function resetarCasa(casa) {
     await updateDoc(doc(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas', casa.id), { visitada: false, atendeu: null });
-    atualizarProgresso(casas.map(c => c.id === casa.id ? { ...c, visitada: false, atendeu: null } : c));
+    const novaLista = casas.map(c => c.id === casa.id ? { ...c, visitada: false, atendeu: null } : c);
+    atualizarProgresso(novaLista);
   }
 
   async function deletarCasa(casa) {
