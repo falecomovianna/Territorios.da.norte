@@ -646,15 +646,13 @@ export default function App() {
         />
       )}
       {screen === 'mapa' && <MapaScreen key={territorioSel.id} territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
-      <div style={{ display: screen === 'quadras' ? 'block' : 'none' }}>
-        {territorioSel && (
-          <QuadrasScreen
-            territorio={territorioSel}
-            onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
-            onBack={() => setScreen('territorios')}
-          />
-        )}
-      </div>
+      {screen === 'quadras' && territorioSel && (
+        <QuadrasScreen
+          territorio={territorioSel}
+          onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
+          onBack={() => setScreen('territorios')}
+        />
+      )}
       {screen === 'casas' && <CasasScreen territorio={territorioSel} quadra={quadraSel} onBack={() => setScreen('quadras')} />}
     </div>
   );
