@@ -92,12 +92,11 @@ export default function App() {
     return () => unsub();
   }, []);
 
-  // ── Quando seleciona território, carrega quadras ──
+  // ── Quando seleciona território, carrega quadras (getDocs = rápido, uma vez só) ──
   useEffect(() => {
     if (!territorioSel) return;
-    if (unsubQuadrasRef.current) unsubQuadrasRef.current();
     setQuadras([]);
-    const unsub = onSnapshot(collection(db, 'territorios', territorioSel.id, 'quadras'), snap => {
+    getDocs(collection(db, 'territorios', territorioSel.id, 'quadras')).then(snap => {
       const list = snap.docs.map(d => ({
         id: d.id, ...d.data(),
         casasCount: d.data().casasCount ?? 0,
@@ -112,8 +111,6 @@ export default function App() {
       });
       setQuadras(list);
     });
-    unsubQuadrasRef.current = unsub;
-    return () => unsub();
   }, [territorioSel?.id]);
 
   // ── Quando seleciona quadra, carrega casas ──
