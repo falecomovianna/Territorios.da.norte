@@ -6,6 +6,7 @@ import {
 } from 'firebase/firestore';
 import './App.css';
 
+// ─── ICONS ───────────────────────────────────────────────────────────────────
 const MapIcon = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
@@ -55,14 +56,140 @@ function ProgressBar({ value }) {
   );
 }
 
-// ─── SCREEN 1: TERRITORIES ────────────────────────────────────────────────────
-function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, loading }) {
+// ─── APP ROOT ──────────────────────────────────────────────────────────────────
+export default function App() {
+  // ── Navegação ──
+  const [view, setView] = useState('territorios'); // territorios | mapa | quadras | casas
+
+  // ── Seleções ──
+  const [territorioSel, setTerritorioSel] = useState(null);
+  const [quadraSel, setQuadraSel] = useState(null);
+
+  // ── Dados em memória ──
+  const [territorios, setTerritorios] = useState([]);
+  const [quadras, setQuadras] = useState([]);
+  const [casas, setCasas] = useState([]);
+
+  // ── Loading só na abertura ──
+  const [loadingApp, setLoadingApp] = useState(true);
+
+  // ── Refs para unsubscribers ──
+  const unsubQuadrasRef = useRef(null);
+  const unsubCasasRef = useRef(null);
+
+  // ── Carrega territórios UMA VEZ na abertura ──
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'territorios'), snap => {
+      const list = snap.docs.map(d => ({ id: d.id, ...d.data(), progresso: d.data().progresso ?? 0 }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      setTerritorios(list);
+      setLoadingApp(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Quando seleciona território, carrega quadras ──
+  useEffect(() => {
+    if (!territorioSel) return;
+    if (unsubQuadrasRef.current) unsubQuadrasRef.current();
+    setQuadras([]);
+    const unsub = onSnapshot(collection(db, 'territorios', territorioSel.id, 'quadras'), snap => {
+      const list = snap.docs.map(d => ({
+        id: d.id, ...d.data(),
+        casasCount: d.data().casasCount ?? 0,
+        progresso: d.data().progresso ?? 0,
+        visitadas: d.data().visitadas ?? 0,
+        naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
+      }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      setQuadras(list);
+    });
+    unsubQuadrasRef.current = unsub;
+    return () => unsub();
+  }, [territorioSel?.id]);
+
+  // ── Quando seleciona quadra, carrega casas ──
+  useEffect(() => {
+    if (!quadraSel || !territorioSel) return;
+    if (unsubCasasRef.current) unsubCasasRef.current();
+    setCasas([]);
+    const unsub = onSnapshot(
+      collection(db, 'territorios', territorioSel.id, 'quadras', quadraSel.id, 'casas'),
+      snap => {
+        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
+        setCasas(list);
+      }
+    );
+    unsubCasasRef.current = unsub;
+    return () => unsub();
+  }, [quadraSel?.id]);
+
+  // ── Navegação ──
+  function irParaTerritorios() { setView('territorios'); }
+  function irParaMapa(t) { setTerritorioSel(t); setView('mapa'); }
+  function irParaQuadras(t) {
+    if (!territorioSel || territorioSel.id !== t.id) setTerritorioSel(t);
+    setView('quadras');
+  }
+  function irParaCasas(q) { setQuadraSel(q); setView('casas'); }
+  function voltarParaQuadras() { setView('quadras'); }
+  function voltarParaTerritorios() { setView('territorios'); }
+
+  if (loadingApp) return <div className="loading"><div className="spinner"/></div>;
+
+  return (
+    <div className="app">
+      {view === 'territorios' && (
+        <TerritoriosView
+          territorios={territorios}
+          onSelectTerritorio={irParaQuadras}
+          onSelectMapa={irParaMapa}
+        />
+      )}
+      {view === 'mapa' && (
+        <MapaView
+          territorio={territorioSel}
+          onBack={voltarParaTerritorios}
+          onVerQuadras={() => irParaQuadras(territorioSel)}
+        />
+      )}
+      {view === 'quadras' && (
+        <QuadrasView
+          territorio={territorioSel}
+          quadras={quadras}
+          onSelectQuadra={irParaCasas}
+          onBack={voltarParaTerritorios}
+        />
+      )}
+      {view === 'casas' && (
+        <CasasView
+          territorio={territorioSel}
+          quadra={quadraSel}
+          casas={casas}
+          setCasas={setCasas}
+          onBack={voltarParaQuadras}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── VIEW 1: TERRITÓRIOS ──────────────────────────────────────────────────────
+function TerritoriosView({ territorios, onSelectTerritorio, onSelectMapa }) {
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [editandoTerritorio, setEditandoTerritorio] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
-
 
   async function addTerritorio() {
     if (!novoNome.trim()) return;
@@ -70,7 +197,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
     setNovoNome(''); setShowAdd(false);
   }
 
-  async function salvarNomeTerritorio(t) {
+  async function salvarNome(t) {
     if (!nomeEditado.trim()) return;
     await updateDoc(doc(db, 'territorios', t.id), { nome: nomeEditado.trim() });
     setEditandoTerritorio(null);
@@ -89,8 +216,6 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
     await deleteDoc(doc(db, 'territorios', t.id));
   }
 
-  if (loading) return <div className="loading"><div className="spinner"/></div>;
-
   return (
     <div className="screen">
       <div className="header">
@@ -102,8 +227,8 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
         <button className={`icon-btn ${editMode ? 'active' : ''}`} style={{marginLeft:'auto'}} onClick={() => {
           if (editMode) { setEditMode(false); setEditandoTerritorio(null); return; }
           const senha = prompt('Digite a senha para editar:');
-          if (senha === '8318') { setEditMode(true); }
-          else if (senha !== null) { alert('Senha incorreta!'); }
+          if (senha === '8318') setEditMode(true);
+          else if (senha !== null) alert('Senha incorreta!');
         }}>
           <PencilIcon />
         </button>
@@ -117,11 +242,9 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
                 {editMode && editandoTerritorio === t.id ? (
                   <div style={{display:'flex', gap:'6px', alignItems:'center'}}>
                     <input className="input-small" style={{flex:1, fontSize:'15px', fontWeight:'800'}}
-                      value={nomeEditado}
-                      onChange={e => setNomeEditado(e.target.value)}
-                      onKeyDown={e => { if(e.key==='Enter') salvarNomeTerritorio(t); }}
-                      autoFocus />
-                    <button className="btn-tiny" onClick={() => salvarNomeTerritorio(t)}>✓</button>
+                      value={nomeEditado} onChange={e => setNomeEditado(e.target.value)}
+                      onKeyDown={e => e.key==='Enter' && salvarNome(t)} autoFocus />
+                    <button className="btn-tiny" onClick={() => salvarNome(t)}>✓</button>
                     <button className="btn-tiny ghost" onClick={() => setEditandoTerritorio(null)}>✕</button>
                   </div>
                 ) : (
@@ -149,7 +272,7 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
           <div className="add-form">
             <input className="input" placeholder="Nome do território (ex: N 01)"
               value={novoNome} onChange={e => setNovoNome(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addTerritorio()} autoFocus />
+              onKeyDown={e => e.key==='Enter' && addTerritorio()} autoFocus />
             <div className="add-form-actions">
               <button className="btn-ghost" onClick={() => setShowAdd(false)}>Cancelar</button>
               <button className="btn-primary" onClick={addTerritorio}>Criar</button>
@@ -163,8 +286,8 @@ function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, load
   );
 }
 
-// ─── SCREEN 1B: MAPA ──────────────────────────────────────────────────────────
-function MapaScreen({ territorio, onBack, onVerQuadras }) {
+// ─── VIEW 1B: MAPA ────────────────────────────────────────────────────────────
+function MapaView({ territorio, onBack, onVerQuadras }) {
   const [fotoUrl, setFotoUrl] = useState(territorio.mapaUrl || '');
   const [editingFoto, setEditingFoto] = useState(false);
   const [inputUrl, setInputUrl] = useState(territorio.mapaUrl || '');
@@ -182,7 +305,6 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
         <div><h2 className="topbar-title">{territorio.nome}</h2><p className="topbar-sub">Mapa do Território</p></div>
         <button className="icon-btn" onClick={() => setEditingFoto(true)}><PencilIcon /></button>
       </div>
-
       {editingFoto && (
         <div className="modal-overlay">
           <div className="modal">
@@ -196,7 +318,6 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
           </div>
         </div>
       )}
-
       {verFoto && (
         <div className="foto-fullscreen" onClick={() => setVerFoto(false)}>
           <div className="foto-fullscreen-inner" onClick={e => e.stopPropagation()}>
@@ -205,7 +326,6 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
           </div>
         </div>
       )}
-
       <div className="mapa-foto-container">
         {fotoUrl ? (
           <div className="mapa-foto-wrapper" onClick={() => setVerFoto(true)}>
@@ -222,42 +342,19 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
           </div>
         )}
       </div>
-
       <button className="btn-full" onClick={onVerQuadras}>Ver Quadras para Marcar Casas</button>
     </div>
   );
 }
 
-// ─── SCREEN 2: QUADRAS ────────────────────────────────────────────────────────
-function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
-  const [quadras, setQuadras] = useState([]);
-  const [loading, setLoading] = useState(true);
+// ─── VIEW 2: QUADRAS ──────────────────────────────────────────────────────────
+function QuadrasView({ territorio, quadras, onSelectQuadra, onBack }) {
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [editandoQuadra, setEditandoQuadra] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'territorios', territorio.id, 'quadras'), snap => {
-      const list = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        casasCount: d.data().casasCount ?? 0,
-        progresso: d.data().progresso ?? 0,
-        visitadas: d.data().visitadas ?? 0,
-        naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
-      }));
-      list.sort((a, b) => {
-        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
-      setQuadras(list);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [territorio.id]);
   async function addQuadra() {
     if (!novoNome.trim()) return;
     await addDoc(collection(db, 'territorios', territorio.id, 'quadras'), {
@@ -281,7 +378,7 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
     await deleteDoc(doc(db, 'territorios', territorio.id, 'quadras', q.id));
   }
 
-  if (loading) return <div className="loading"><div className="spinner"/></div>;
+  const loading = quadras.length === 0;
 
   return (
     <div className="screen">
@@ -294,8 +391,8 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
         <button className={`icon-btn ${editMode ? 'active' : ''}`} onClick={() => {
           if (editMode) { setEditMode(false); setEditandoQuadra(null); return; }
           const senha = prompt('Digite a senha para editar:');
-          if (senha === '8318') { setEditMode(true); }
-          else if (senha !== null) { alert('Senha incorreta!'); }
+          if (senha === '8318') setEditMode(true);
+          else if (senha !== null) alert('Senha incorreta!');
         }}>
           <PencilIcon />
         </button>
@@ -304,63 +401,59 @@ function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
         <div className="legenda-item"><span className="dot vermelho"/><span>Não Atendeu / Não Visitado</span></div>
         <div className="legenda-item"><span className="dot verde"/><span>Sim (Atendeu)</span></div>
       </div>
-      <div className="quadras-grid">
-        {quadras.map(q => (
-          <div key={q.id} className="quadra-card" onClick={() => !editMode && onSelectQuadra(q)}>
-            {editMode && editandoQuadra === q.id ? (
-              <div className="quadra-card-header">
-                <input className="input-small" style={{width:'90px', fontSize:'15px', fontWeight:'800'}}
-                  value={nomeEditado}
-                  onChange={e => setNomeEditado(e.target.value)}
-                  onKeyDown={e => { if(e.key==='Enter') salvarNomeQuadra(q); }}
-                  onClick={e => e.stopPropagation()}
-                  autoFocus />
-                <button className="btn-tiny" onClick={e => { e.stopPropagation(); salvarNomeQuadra(q); }}>✓</button>
+      {loading ? (
+        <div className="loading"><div className="spinner"/></div>
+      ) : (
+        <div className="quadras-grid">
+          {quadras.map(q => (
+            <div key={q.id} className="quadra-card" onClick={() => !editMode && onSelectQuadra(q)}>
+              {editMode && editandoQuadra === q.id ? (
+                <div className="quadra-card-header">
+                  <input className="input-small" style={{width:'90px', fontSize:'15px', fontWeight:'800'}}
+                    value={nomeEditado} onChange={e => setNomeEditado(e.target.value)}
+                    onKeyDown={e => e.key==='Enter' && salvarNomeQuadra(q)}
+                    onClick={e => e.stopPropagation()} autoFocus />
+                  <button className="btn-tiny" onClick={e => { e.stopPropagation(); salvarNomeQuadra(q); }}>✓</button>
+                </div>
+              ) : (
+                <div className="quadra-card-header">
+                  <h3 className="quadra-nome">{q.nome}</h3>
+                  {editMode && (
+                    <div style={{display:'flex', gap:'4px'}}>
+                      <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}><PencilIcon /></button>
+                      <button className="btn-lapis-quadra" style={{color:'#ef4444'}} onClick={e => { e.stopPropagation(); deletarQuadra(q); }}><TrashIcon /></button>
+                    </div>
+                  )}
+                </div>
+              )}
+              <div className="quadra-contadores">
+                <span className="contador-vermelho">🔴 {q.naoVisitadas}</span>
+                <span className="contador-verde">🟢 {q.visitadas}</span>
               </div>
-            ) : (
-              <div className="quadra-card-header">
-                <h3 className="quadra-nome">{q.nome}</h3>
-                {editMode && (
-                  <div style={{display:'flex', gap:'4px'}}>
-                    <button className="btn-lapis-quadra" onClick={e => { e.stopPropagation(); setEditandoQuadra(q.id); setNomeEditado(q.nome); }}>
-                      <PencilIcon />
-                    </button>
-                    <button className="btn-lapis-quadra" style={{color:'#ef4444'}} onClick={e => { e.stopPropagation(); deletarQuadra(q); }}>
-                      <TrashIcon />
-                    </button>
-                  </div>
-                )}
+            </div>
+          ))}
+          {showAdd ? (
+            <div className="add-form" style={{gridColumn:'span 2'}}>
+              <input className="input" placeholder="Nome da quadra (ex: Q1)"
+                value={novoNome} onChange={e => setNovoNome(e.target.value)}
+                onKeyDown={e => e.key==='Enter' && addQuadra()} autoFocus />
+              <div className="add-form-actions">
+                <button className="btn-ghost" onClick={() => setShowAdd(false)}>Cancelar</button>
+                <button className="btn-primary" onClick={addQuadra}>Criar</button>
               </div>
-            )}
-            <div className="quadra-contadores">
-              <span className="contador-vermelho">🔴 {q.naoVisitadas}</span>
-              <span className="contador-verde">🟢 {q.visitadas}</span>
             </div>
-          </div>
-        ))}
-        {showAdd ? (
-          <div className="add-form" style={{gridColumn:'span 2'}}>
-            <input className="input" placeholder="Nome da quadra (ex: Q1)"
-              value={novoNome} onChange={e => setNovoNome(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addQuadra()} autoFocus />
-            <div className="add-form-actions">
-              <button className="btn-ghost" onClick={() => setShowAdd(false)}>Cancelar</button>
-              <button className="btn-primary" onClick={addQuadra}>Criar</button>
-            </div>
-          </div>
-        ) : (
-          <button className="btn-add quadra-add" onClick={() => setShowAdd(true)}><PlusIcon /> Nova Quadra</button>
-        )}
-      </div>
+          ) : (
+            <button className="btn-add quadra-add" onClick={() => setShowAdd(true)}><PlusIcon /> Nova Quadra</button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
-// ─── SCREEN 3: CASAS ──────────────────────────────────────────────────────────
-function CasasScreen({ territorio, quadra, onBack }) {
-  const [casas, setCasas] = useState([]);
+// ─── VIEW 3: CASAS ────────────────────────────────────────────────────────────
+function CasasView({ territorio, quadra, casas, setCasas, onBack }) {
   const [ruas, setRuas] = useState(quadra.ruas || { topo: '', baixo: '', esquerda: '', direita: '' });
-  const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [confirmCasa, setConfirmCasa] = useState(null);
   const [showAddCasa, setShowAddCasa] = useState(null);
@@ -373,22 +466,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
     return () => { mountedRef.current = false; };
   }, []);
 
-  useEffect(() => {
-    // onSnapshot para casas — sem requisição separada para ruas
-    const unsub = onSnapshot(
-      collection(db, 'territorios', territorio.id, 'quadras', quadra.id, 'casas'),
-      snap => {
-        if (!mountedRef.current) return;
-        const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        list.sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999) || String(a.numero).localeCompare(String(b.numero), 'pt', { numeric: true }));
-        setCasas(list);
-        setLoading(false);
-      }
-    );
-    return () => unsub();
-  }, [territorio.id, quadra.id]);
-
-  // useMemo: casas por lado calculadas uma vez por render
   const casasPorLadoMemo = useMemo(() => {
     const resultado = { topo: [], baixo: [], esquerda: [], direita: [] };
     for (const c of casas) {
@@ -475,7 +552,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
       <div className="add-casa-inline" onClick={e => e.stopPropagation()}>
         <input className="input-small" placeholder="Nº" value={novoCasaNum}
           onChange={e => setNovoCasaNum(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addCasa(lado, posicao)} autoFocus />
+          onKeyDown={e => e.key==='Enter' && addCasa(lado, posicao)} autoFocus />
         <button className="btn-tiny" onClick={() => addCasa(lado, posicao)}>✓</button>
         <button className="btn-tiny ghost" onClick={() => { setShowAddCasa(null); setNovoCasaNum(''); }}>✕</button>
       </div>
@@ -514,7 +591,7 @@ function CasasScreen({ territorio, quadra, onBack }) {
     );
   }
 
-  if (loading) return <div className="loading"><div className="spinner"/></div>;
+  if (casas.length === 0) return <div className="loading"><div className="spinner"/></div>;
 
   return (
     <div className="screen">
@@ -528,8 +605,8 @@ function CasasScreen({ territorio, quadra, onBack }) {
           onClick={() => {
             if (editMode) { salvarEdicao(); return; }
             const senha = prompt('Digite a senha para editar:');
-            if (senha === '8318') { setEditMode(true); }
-            else if (senha !== null) { alert('Senha incorreta!'); }
+            if (senha === '8318') setEditMode(true);
+            else if (senha !== null) alert('Senha incorreta!');
           }}>
           {editMode ? '✓' : <PencilIcon />}
         </button>
@@ -548,21 +625,18 @@ function CasasScreen({ territorio, quadra, onBack }) {
           </button>
         </div>
       )}
-
       <div className="quadra-wrap">
         <div className="rua-label-wrap rua-topo-wrap">
           {editMode
             ? <input className="input-rua" value={editRuas.topo} onChange={e => setEditRuas({...editRuas, topo: e.target.value})} placeholder="Rua de cima" />
             : ruas.topo && <span className="rua-label">{ruas.topo.toUpperCase()}</span>}
         </div>
-
         <div className="quadra-linha-meio">
           <div className="rua-label-wrap rua-lado-wrap">
             {editMode
               ? <input className="input-rua vertical" value={editRuas.esquerda} onChange={e => setEditRuas({...editRuas, esquerda: e.target.value})} placeholder="Esq." />
               : ruas.esquerda && <span className="rua-label vertical">{ruas.esquerda.toUpperCase()}</span>}
           </div>
-
           <div className="quadra-box">
             <div className="quadra-label-bg">{quadra.nome}</div>
             {renderFileiraCasas('topo')}
@@ -572,21 +646,18 @@ function CasasScreen({ territorio, quadra, onBack }) {
             </div>
             {renderFileiraCasas('baixo')}
           </div>
-
           <div className="rua-label-wrap rua-lado-wrap">
             {editMode
               ? <input className="input-rua vertical" value={editRuas.direita} onChange={e => setEditRuas({...editRuas, direita: e.target.value})} placeholder="Dir." />
               : ruas.direita && <span className="rua-label vertical">{ruas.direita.toUpperCase()}</span>}
           </div>
         </div>
-
         <div className="rua-label-wrap rua-baixo-wrap">
           {editMode
             ? <input className="input-rua" value={editRuas.baixo} onChange={e => setEditRuas({...editRuas, baixo: e.target.value})} placeholder="Rua de baixo" />
             : ruas.baixo && <span className="rua-label">{ruas.baixo.toUpperCase()}</span>}
         </div>
       </div>
-
       {confirmCasa && (
         <div className="modal-overlay">
           <div className="modal">
@@ -607,58 +678,6 @@ function CasasScreen({ territorio, quadra, onBack }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-// ─── APP ROOT ──────────────────────────────────────────────────────────────────
-export default function App() {
-  const [screen, setScreen] = useState('territorios');
-  const [territorioSel, setTerritorioSel] = useState(null);
-  const [quadraSel, setQuadraSel] = useState(null);
-  const [territorios, setTerritorios] = useState([]);
-  const [loadingTerritorios, setLoadingTerritorios] = useState(true);
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'territorios'), snap => {
-      const list = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        progresso: d.data().progresso ?? 0
-      }));
-      list.sort((a, b) => {
-        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
-      setTerritorios(list);
-      setLoadingTerritorios(false);
-    });
-    return () => unsub();
-  }, []);
-
-
-  return (
-    <div className="app">
-      {screen === 'territorios' && (
-        <TerritoriosScreen
-          territorios={territorios}
-          loading={loadingTerritorios}
-          onSelectTerritorio={t => { setTerritorioSel(t); setScreen('quadras'); }}
-          onSelectMapa={t => { setTerritorioSel(t); setScreen('mapa'); }}
-        />
-      )}
-      {screen === 'mapa' && <MapaScreen key={territorioSel.id} territorio={territorioSel} onBack={() => setScreen('territorios')} onVerQuadras={() => setScreen('quadras')} />}
-      <div style={{ display: screen === 'quadras' ? 'block' : 'none' }}>
-        {territorioSel && (
-          <QuadrasScreen
-            territorio={territorioSel}
-            onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
-            onBack={() => setScreen('territorios')}
-          />
-        )}
-      </div>
-      {screen === 'casas' && <CasasScreen territorio={territorioSel} quadra={quadraSel} onBack={() => setScreen('quadras')} />}
     </div>
   );
 }
