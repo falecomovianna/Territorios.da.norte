@@ -56,32 +56,13 @@ function ProgressBar({ value }) {
 }
 
 // ─── SCREEN 1: TERRITORIES ────────────────────────────────────────────────────
-function TerritoriosScreen({ onSelectTerritorio, onSelectMapa }) {
-  const [territorios, setTerritorios] = useState([]);
-  const [loading, setLoading] = useState(true);
+function TerritoriosScreen({ onSelectTerritorio, onSelectMapa, territorios, loading }) {
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [editandoTerritorio, setEditandoTerritorio] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
 
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'territorios'), snap => {
-      const list = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        progresso: d.data().progresso ?? 0
-      }));
-      list.sort((a, b) => {
-        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
-      setTerritorios(list);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, []);
 
   async function addTerritorio() {
     if (!novoNome.trim()) return;
@@ -636,11 +617,33 @@ export default function App() {
   const [screen, setScreen] = useState('territorios');
   const [territorioSel, setTerritorioSel] = useState(null);
   const [quadraSel, setQuadraSel] = useState(null);
+  const [territorios, setTerritorios] = useState([]);
+  const [loadingTerritorios, setLoadingTerritorios] = useState(true);
+
+  useEffect(() => {
+    const unsub = onSnapshot(collection(db, 'territorios'), snap => {
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        progresso: d.data().progresso ?? 0
+      }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      setTerritorios(list);
+      setLoadingTerritorios(false);
+    });
+    return () => unsub();
+  }, []);
 
   return (
     <div className="app">
       {screen === 'territorios' && (
         <TerritoriosScreen
+          territorios={territorios}
+          loading={loadingTerritorios}
           onSelectTerritorio={t => { setTerritorioSel(t); setScreen('quadras'); }}
           onSelectMapa={t => { setTerritorioSel(t); setScreen('mapa'); }}
         />
