@@ -229,35 +229,12 @@ function MapaScreen({ territorio, onBack, onVerQuadras }) {
 }
 
 // ─── SCREEN 2: QUADRAS ────────────────────────────────────────────────────────
-function QuadrasScreen({ territorio, onSelectQuadra, onBack }) {
-  const [quadras, setQuadras] = useState([]);
-  const [loading, setLoading] = useState(true);
+function QuadrasScreen({ territorio, onSelectQuadra, onBack, quadras, loading }) {
   const [showAdd, setShowAdd] = useState(false);
   const [novoNome, setNovoNome] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [editandoQuadra, setEditandoQuadra] = useState(null);
   const [nomeEditado, setNomeEditado] = useState('');
-
-  useEffect(() => {
-    const unsub = onSnapshot(collection(db, 'territorios', territorio.id, 'quadras'), snap => {
-      const list = snap.docs.map(d => ({
-        id: d.id,
-        ...d.data(),
-        casasCount: d.data().casasCount ?? 0,
-        progresso: d.data().progresso ?? 0,
-        visitadas: d.data().visitadas ?? 0,
-        naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
-      }));
-      list.sort((a, b) => {
-        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
-        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
-        return numA - numB;
-      });
-      setQuadras(list);
-      setLoading(false);
-    });
-    return () => unsub();
-  }, [territorio.id]);
 
   async function addQuadra() {
     if (!novoNome.trim()) return;
@@ -619,6 +596,8 @@ export default function App() {
   const [quadraSel, setQuadraSel] = useState(null);
   const [territorios, setTerritorios] = useState([]);
   const [loadingTerritorios, setLoadingTerritorios] = useState(true);
+  const [quadras, setQuadras] = useState([]);
+  const [loadingQuadras, setLoadingQuadras] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, 'territorios'), snap => {
@@ -638,6 +617,29 @@ export default function App() {
     return () => unsub();
   }, []);
 
+  useEffect(() => {
+    if (!territorioSel) return;
+    setLoadingQuadras(true);
+    const unsub = onSnapshot(collection(db, 'territorios', territorioSel.id, 'quadras'), snap => {
+      const list = snap.docs.map(d => ({
+        id: d.id,
+        ...d.data(),
+        casasCount: d.data().casasCount ?? 0,
+        progresso: d.data().progresso ?? 0,
+        visitadas: d.data().visitadas ?? 0,
+        naoVisitadas: d.data().naoVisitadas ?? (d.data().casasCount ?? 0)
+      }));
+      list.sort((a, b) => {
+        const numA = parseInt(a.nome.replace(/\D/g, '')) || 0;
+        const numB = parseInt(b.nome.replace(/\D/g, '')) || 0;
+        return numA - numB;
+      });
+      setQuadras(list);
+      setLoadingQuadras(false);
+    });
+    return () => unsub();
+  }, [territorioSel?.id]);
+
   return (
     <div className="app">
       {screen === 'territorios' && (
@@ -653,6 +655,8 @@ export default function App() {
         {territorioSel && (
           <QuadrasScreen
             territorio={territorioSel}
+            quadras={quadras}
+            loading={loadingQuadras}
             onSelectQuadra={q => { setQuadraSel(q); setScreen('casas'); }}
             onBack={() => setScreen('territorios')}
           />
